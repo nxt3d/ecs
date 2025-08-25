@@ -51,7 +51,7 @@ Features:
 
 - **Star Addresses**: Any Ethereum mainnet address 
 - **Star Domains**: Any domain name (ENS, traditional domains, etc.)
-- **Query Stars**: Check star counts via ENS resolution
+- **Query Stars**: Check star counts using ECS (via ENS resolution)
 - **Onchain Storage**: All stars are permanently recorded on Ethereum Sepolia
 
 **How the Example EthStars Works:**
