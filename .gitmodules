@@ -1,0 +1,6 @@
+[submodule "lib/openzeppelin-contracts"]
+	path = lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "lib/unruggable-gateways"]
+	path = lib/unruggable-gateways
+	url = https://github.com/unruggable-labs/unruggable-gateways
