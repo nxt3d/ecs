@@ -63,6 +63,11 @@ Features:
 
 ### EthStars Testnet Credential Resolvers
 
+**Base Sepolia Contracts (Onchain Star Storage):**
+- **StarResolver:** `0x4dbccAF1dc6c878EBe3CE8041886dDb36D339cA7` ([BaseScan](https://sepolia.basescan.org/address/0x4dbccaf1dc6c878ebe3ce8041886ddb36d339ca7))
+- **StarNameResolver:** `0x69f3E82bA7c4B640a3b2c0FD5eA67cDA86bE8F88` ([BaseScan](https://sepolia.basescan.org/address/0x69f3e82ba7c4b640a3b2c0fd5ea67cda86be8f88))
+
+**L1 Ethereum Sepolia Contracts (Fetch Data from Base Sepolia):**
 - **OffchainStarAddrResolver (Address-based):** `0x9d89df9b49f21411be65af54a68f58ad9a05757d` [View](https://sepolia.etherscan.io/address/0x9d89df9b49f21411be65af54a68f58ad9a05757d)
 - **OffchainStarNameResolver (Name-based):** `0x38ae0879afff64ab521610d5f812cb225308df02` [View](https://sepolia.etherscan.io/address/0x38ae0879afff64ab521610d5f812cb225308df02)
 
