@@ -56,7 +56,7 @@ Features:
 
 **How the Example EthStars Works:**
 - Users can star any address or domain via the example implementation
-- Stars are written onchain on Base Sepolia, using @StarNameResolver.sol @StarResolver.sol
+- Stars are written onchain on Base Sepolia, using StarNameResolver.sol and StarResolver.sol
 - Anyone can query star counts via ENS resolution
 
 > **Live App:** The production [EthStars App](https://ethstars.info/) runs on Base mainnet, while this Sepolia deployment serves as a working example of the ECS protocol.
