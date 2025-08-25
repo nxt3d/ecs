@@ -19,7 +19,7 @@ ECS is a decentralized protocol built on Ethereum for storing, retrieving, and v
 
 ECS is currently deployed on the Sepolia testnet. The contracts allow for credential providers to register a namespace, such as `ethstars.ecs.eth`, and then set a credential resolver for that namespace. The credential resolver is a contract that implements the `ICredentialResolver` interface, and is responsible for resolving the credential for a given identifier.
 
-> ** Example Credential Resolution**
+> **Example Credential Resolution**
 >
 > - **Credential:** `eth.ecs.ethstars.stars`
 > - **Identifier:** `vitalik.eth`
