@@ -87,23 +87,20 @@ npm install @nxt3d/ecs-resolver
 ### Basic Usage
 
 ```typescript
-import { createPublicClient, http } from 'viem'
-import { sepolia } from 'viem/chains'
 import { createECSResolver } from '@nxt3d/ecs-resolver'
 
-// Initialize Viem client
-const publicClient = createPublicClient({
-  chain: sepolia,
-  transport: http('YOUR_RPC_URL')
+// Create ECS resolver
+const resolver = createECSResolver({ 
+  network: 'sepolia',
+  rpcUrl: 'YOUR_RPC_URL'
 })
 
-// Create ECS resolver
-const resolver = createECSResolver({ publicClient })
-
 // Resolve credentials
-const result = await resolver.resolveNameCredential('vitalik.eth', 'eth.ecs.ethstars.stars')
-console.log(result.value) // "2"
+const result = await resolver.resolve('vitalik.eth', 'eth.ecs.ethstars.stars')
+console.log(result) // "2"
 ```
+
+The new API simplifies network configuration by handling Viem setup internally. You can also use `resolver.resolveWithDetails()` for detailed results including success status and ENS names.
 
 For complete documentation and API reference, see the [@nxt3d/ecs-resolver npm package](https://www.npmjs.com/package/@nxt3d/ecs-resolver).
 

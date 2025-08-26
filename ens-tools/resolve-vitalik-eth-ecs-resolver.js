@@ -1,5 +1,3 @@
-import { createPublicClient, http } from 'viem'
-import { sepolia } from 'viem/chains'
 import { createECSResolver } from '@nxt3d/ecs-resolver'
 import dotenv from 'dotenv'
 
@@ -24,14 +22,11 @@ const main = async () => {
   console.log("- vitalik.eth");
   console.log("- 0xd8da6bf26964af9d7eed9e03e53415d37aa96045\n");
   
-  // Initialize Viem public client
-  const publicClient = createPublicClient({
-    chain: sepolia,
-    transport: http(process.env.SEPOLIA_RPC_URL)
+  // Create ECS resolver with network configuration
+  const resolver = createECSResolver({ 
+    network: 'sepolia',
+    rpcUrl: process.env.SEPOLIA_RPC_URL
   })
-
-  // Create ECS resolver
-  const resolver = createECSResolver({ publicClient })
   
   // Vitalik's information
   const ensName = "vitalik.eth"
@@ -43,7 +38,7 @@ const main = async () => {
     console.log("🔍 Name-based Resolution");
     console.log("------------------------");
     
-    const nameResult = await resolver.resolveNameCredential(ensName, credentialKey)
+    const nameResult = await resolver.resolveWithDetails(ensName, credentialKey)
     console.log(`📍 ENS Name: ${nameResult.ensName}`);
     
     if (nameResult.success) {
@@ -58,7 +53,7 @@ const main = async () => {
     console.log("🔍 Address-based Resolution");
     console.log("---------------------------");
     
-    const addressResult = await resolver.resolveAddressCredential(walletAddress, credentialKey)
+    const addressResult = await resolver.resolveAddressWithDetails(walletAddress, credentialKey)
     console.log(`📍 ENS Name: ${addressResult.ensName}`);
     
     if (addressResult.success) {
