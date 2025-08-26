@@ -209,17 +209,7 @@ forge test --match-contract "StarNameResolverIntegrationTest"
 forge test -vvv
 ```
 
-### Deploy to Testnet
-
-```bash
-# Copy environment variables
-cp .env.example .env
-# Edit .env with your keys
-
-# Deploy to Sepolia (with environment variables sourced)
-source .env && forge script script/DeployECS.s.sol:DeployECS --rpc-url $SEPOLIA_RPC_URL --private-key $DEPLOYER_PRIVATE_KEY --broadcast --verify --etherscan-api-key $ETHERSCAN_API_KEY
-
-## Creating Custom Credential Resolvers
+### Create Credential Resolver
 
 ### 1. Implement the ICredentialResolver Interface
 
@@ -242,7 +232,7 @@ contract MyCustomResolver is ICredentialResolver {
 }
 ```
 
-### 2. Register Your Namespace
+### 2. Register Credential
 
 ```solidity
 // Register namespace
@@ -253,6 +243,7 @@ bytes32 namespace = controller.registerNamespace{value: fee}("myservice", 365 da
 MyCustomResolver resolver = new MyCustomResolver();
 
 // Register the credential resolver for your namespace
+// For name-based credentials, use the nameResolver
 addressResolver.setCredentialResolver(namespace, address(resolver));
 ```
 
