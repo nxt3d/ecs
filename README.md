@@ -9,7 +9,7 @@
 **Last Updated:** August 25, 2025  
 **Deployment:** Ethereum Sepolia Testnet
 
-ECS is a decentralized protocol built on Ethereum for storing, retrieving, and verifying digital credentials. It enables any application or service to create custom credentials with guaranteed namespace ownership and flexible onchain/offchain data storage. Credentials are core primitives for idenitty, and can be understood broadly to be any record or attestation made by a third party about an idenitty vs records made by the owner of the idenitty. A simple example is a reputation system where third parties attest to the "realness" of the identity, i.e. "vitalik.eth" is the real Vitalik Buterin's ENS name.
+ECS is a decentralized protocol built on Ethereum for storing, retrieving, and verifying digital credentials. It enables any application or service to create custom credentials with guaranteed namespace ownership and flexible onchain/offchain data storage. Credentials are core primitives for identity, and can be understood broadly to be any record or attestation made by a third party about an identity vs records made by the owner of the identity. A simple example is a reputation system where third parties attest to the "realness" of the identity, i.e. "vitalik.eth" is the real Vitalik Buterin's ENS name.
 
 > **⚠️ Beta Notice:** This is a beta release deployed to Ethereum Sepolia testnet. The protocol is functional and tested, but may undergo changes before mainnet release. Use at your own risk in production environments.
 
@@ -18,15 +18,6 @@ ECS is a decentralized protocol built on Ethereum for storing, retrieving, and v
 ## ECS Testnet Deployment
 
 ECS is currently deployed on the Sepolia testnet. The contracts allow for credential providers to register a namespace, such as `ethstars.ecs.eth`, and then set a credential resolver for that namespace. The credential resolver is a contract that implements the `ICredentialResolver` interface, and is responsible for resolving the credential for a given identifier.
-
-> **Example Credential Resolution**
->
-> - **Credential:** `eth.ecs.ethstars.stars`
-> - **Identifier:** `vitalik.eth`
-> - **Result:** `"12728"`
-
-Credentials are resolved via ENS using the ecs.eth domain. For example, a credetnial called `eth.ecs.ethstars.stars` can be resolved for "vitalik.eth" by querying the special ENS name `vitalik.eth.name.ecs.eth` for the credential (text record) `eth.ecs.ethstars.stars`. The result will be the credential value such as "12728". It is also possibele to resolve credentials for DNS names like `ethereum.org` or wallet addresses using `addr.ecs.eth`. 
-
 
 ### Key Contracts (Sepolia)
 | Contract            | Address                                    | Etherscan |
@@ -83,27 +74,42 @@ ECS unifies blockchain based credentials into a single service:
 
 ECS is built on L1 Ethereum (Currently deployed to Sepolia testnet), with credential resolvers that can access and aggregate data from one or more L2s or offchain sources. This architecture enables cost-effective data storage while maintaining the security and decentralization of Ethereum mainnet for namespace ownership and core protocol logic. Crucially, L1 Ethereum's unique position as the settlement layer allows it to access the state of all L2s, making it the ideal foundation for cross-chain credential resolution that can verify and combine data from multiple L2s.
 
-## Resolving Credentials
+## Resolving Credentials using ECS Resolver
 
-ECS uses ENS (Ethereum Name Service) to resolve credentials, leveraging the existing domain name infrastructure and tooling including popular libraries like Ethers.js and Viem. When a credential is requested, the system automatically routes the query to the appropriate credential resolver. This allows credentials to be resolved using familiar domain-style names while maintaining the flexibility to implement custom credential logic behind each namespace.
+The easiest way to interact with ECS is using our official TypeScript library `@nxt3d/ecs-resolver`.
 
-## How Credential Resolution Works with ENS
+### Installation
 
-ECS leverages the Ethereum Name Service (ENS) to make credentials universally accessible using familiar ENS name lookups and text record queries. This means any wallet, dapp, or script that supports ENS can also resolve ECS credentials—no new tooling required.
+```bash
+npm install @nxt3d/ecs-resolver
+```
 
-### 1. Credential Namespaces and Registration
+### Basic Usage
 
-- **Namespace Registration:**  
-  Credentials are registered in the ECS Registry as namespaces. Each namespace is equivalent to a credential name (e.g., `ethstars`) and is registered in the normal domain order (e.g., `ethstars.ecs.eth`), not reversed.
+```typescript
+import { createPublicClient, http } from 'viem'
+import { sepolia } from 'viem/chains'
+import { createECSResolver } from '@nxt3d/ecs-resolver'
 
-- **Mono-Resolvers:**  
-  Credentials are resolved through dedicated mono-resolvers, which are set on ENS subdomains that act as endpoints for specific credential types.  
-  - **Current Mono-Resolvers:**  
-    - `name.ecs.eth` for name-based credentials  
-    - `addr.ecs.eth` for address-based credentials  
-  - **Extensibility:** More mono-resolvers can be added in the future to support new credential types.
+// Initialize Viem client
+const publicClient = createPublicClient({
+  chain: sepolia,
+  transport: http('YOUR_RPC_URL')
+})
 
-### 2. Credential Naming Patterns
+// Create ECS resolver
+const resolver = createECSResolver({ publicClient })
+
+// Resolve credentials
+const result = await resolver.resolveNameCredential('vitalik.eth', 'eth.ecs.ethstars.stars')
+console.log(result.value) // "2"
+```
+
+For complete documentation and API reference, see the [@nxt3d/ecs-resolver npm package](https://www.npmjs.com/package/@nxt3d/ecs-resolver).
+
+## Resolving Credentials using Ethers.js
+
+ECS Credentials can be resolved using Ethers.js directly using ENS. ECS mono-resolvers are set on `name.ecs.eth` and `addr.ecs.eth`. When a credential is requested, the system automatically routes the query to the appropriate credential resolver.
 
 ECS credentials are resolved as ENS sub-subdomains, following these patterns:
 
@@ -126,9 +132,9 @@ ECS credentials are resolved as ENS sub-subdomains, following these patterns:
   `d8da6bf26964af9d7eed9e03e53415d37aa96045.3c.addr.ecs.eth`  
   - This resolves to the credential for the Ethereum address `0xd8da6bf26964af9d7eed9e03e53415d37aa96045`, with the coin type `60`.
 
-### 3. Example: Querying a Credential
+### Example: Querying a Credential
 
-Suppose you want to check how many "stars" Vitalik's address has in the EthStars credential:
+To check how many "stars" Vitalik's address has in the EthStars credential:
 
 1. **Construct the ENS name:**  
    `d8da6bf26964af9d7eed9e03e53415d37aa96045.3c.addr.ecs.eth`
@@ -178,8 +184,8 @@ Try the live demo script to see ECS in action:
 cp .env.example .env
 # Edit .env and add your SEPOLIA_RPC_URL
 
-# Run the demo script
-node ens-tools/resolve-vitalik-eth.js
+# Run the demo script using @nxt3d/ecs-resolver
+node ens-tools/resolve-vitalik-eth-ecs-resolver.js
 ```
 
 This script demonstrates:
