@@ -114,89 +114,71 @@ contract ECSNameResolver is IExtendedResolver, CCIPReader {
     
     /**
      * @dev Extract domain identifier from DNS name
-     * Expected format: domain.com.name.<anything>.eth
+     * Expected format: domain.com.<any-label>.<anything>.eth
      * Returns: DNS-encoded domain.com
      * @param name The full DNS-encoded name
      * @return identifier The DNS-encoded domain identifier
      */
     function _extractNameIdentifier(bytes calldata name) internal pure returns (bytes memory) {
-        if (name.length < 10) { // Minimum for "name.x.eth" + null terminator
+        if (name.length < 10) { // Minimum for "a.b.c.eth" + null terminator
             revert InvalidDNSEncoding();
         }
         
-        // Parse DNS name forward through labels
-        // DNS format: [length][label][length][label]...[0]
-        // Looking for pattern: <domain labels>...[4]name[?]<anything>[3]eth[0]
+        // Parse through all labels to find the structure
+        // We need to find: <domain labels>...<any-label>.<anything>.eth
+        // We want to extract everything before the second-to-last non-eth label
         
+        // First pass: find all label positions and identify "eth" terminator
+        uint256[] memory labelPositions = new uint256[](32); // Max 32 labels should be enough
+        uint256 labelCount = 0;
         uint256 pos = 0;
-        uint256 namePosition = 0;
-        bool foundName = false;
+        uint256 ethLabelIndex = 0;
         
-        // Parse forward through labels
-        while (pos < name.length) {
-            // Check for null terminator
-            if (name[pos] == 0x00) {
-                break;
-            }
+        // Parse all labels
+        while (pos < name.length && labelCount < 32) {
+            if (name[pos] == 0x00) break; // null terminator
             
             uint8 labelLength = uint8(name[pos]);
+            if (labelLength == 0) break;
             
             // Check if we have enough bytes for this label
             if (pos + labelLength + 1 > name.length) {
                 revert InvalidDNSEncoding();
             }
             
-            // Check if this is the "name" label
-            if (labelLength == 4 && 
-                name[pos + 1] == 0x6e && // 'n'
-                name[pos + 2] == 0x61 && // 'a'
-                name[pos + 3] == 0x6d && // 'm'
-                name[pos + 4] == 0x65) { // 'e'
+            labelPositions[labelCount] = pos;
+            
+            // Check if this is the "eth" label
+            if (labelLength == 3 && 
+                name[pos + 1] == 0x65 && // 'e'
+                name[pos + 2] == 0x74 && // 't'
+                name[pos + 3] == 0x68) { // 'h'
                 
-                namePosition = pos;
-                foundName = true;
-                pos += labelLength + 1; // Move past "name" label
-                
-                // Skip the next label (can be anything)
-                if (pos >= name.length || name[pos] == 0x00) {
-                    revert InvalidDNSEncoding();
-                }
-                
-                uint8 nextLabelLength = uint8(name[pos]);
-                if (pos + nextLabelLength + 1 > name.length) {
-                    revert InvalidDNSEncoding();
-                }
-                pos += nextLabelLength + 1; // Move past the next label
-                
-                // Check if the following label is "eth" and terminal
-                if (pos + 4 <= name.length && 
-                    name[pos] == 0x03 && // length 3
-                    name[pos + 1] == 0x65 && // 'e'
-                    name[pos + 2] == 0x74 && // 't'
-                    name[pos + 3] == 0x68 && // 'h'
-                    pos + 4 < name.length && 
-                    name[pos + 4] == 0x00) { // null terminator
-                    
-                    // Found valid pattern: extract domain identifier
-                    bytes memory identifier = new bytes(namePosition + 1);
-                    for (uint256 i = 0; i < namePosition; i++) {
-                        identifier[i] = name[i];
-                    }
-                    identifier[namePosition] = 0x00; // Add null terminator
-                    
-                    return identifier;
-                }
-                
-                // If we reach here, pattern doesn't match - continue searching
-                foundName = false;
-            } else {
-                // Move to next label
-                pos += labelLength + 1;
+                ethLabelIndex = labelCount;
             }
+            
+            labelCount++;
+            pos += labelLength + 1;
         }
         
-        // If we reach here, no valid pattern was found
-        revert InvalidDNSEncoding();
+        // Validate structure: need at least domain.something.anything.eth (4 labels minimum)
+        if (labelCount < 4 || ethLabelIndex == 0 || ethLabelIndex != labelCount - 1) {
+            revert InvalidDNSEncoding();
+        }
+        
+        // Extract domain identifier: everything before the second-to-last non-eth label
+        // For domain.com.name.namespace.eth -> extract domain.com
+        // For a.b.c.name2.test.eth -> extract a.b.c
+        uint256 identifierEndPos = labelPositions[ethLabelIndex - 2]; // Two labels before "eth"
+        
+        // Create identifier with null termination
+        bytes memory identifier = new bytes(identifierEndPos + 1);
+        for (uint256 i = 0; i < identifierEndPos; i++) {
+            identifier[i] = name[i];
+        }
+        identifier[identifierEndPos] = 0x00; // Add null terminator
+        
+        return identifier;
     }
     
     /**
@@ -230,9 +212,8 @@ contract ECSNameResolver is IExtendedResolver, CCIPReader {
         bytes memory response,
         bytes memory extraData
     ) external pure returns (bytes memory) {
-        // Decode the string result from the credential resolver
+        // Credential resolvers now return strings directly, so just re-encode
         string memory result = abi.decode(response, (string));
-        // Re-encode it for the resolve function
         return abi.encode(result);
     }
     

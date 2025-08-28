@@ -118,39 +118,61 @@ contract ECSAddressResolver is IExtendedResolver, CCIPReader {
     
     /**
      * @dev Extract the address identifier from a DNS-encoded name
-     * Expected format: address.cointype.namespace.eth
-     * Returns: DNS-encoded address identifier
+     * Expected format: address.cointype.<any-namespace>.eth
+     * Returns: DNS-encoded address identifier (address.cointype)
      */
     function _extractAddressIdentifier(bytes calldata name) internal pure returns (bytes memory) {
-        
-        uint256 offset = 0;
-        uint256 labelCount = 0;
-        uint256 identifierEnd = 0;
-        
-        // We need to find where the address+cointype part ends
-        // Format: address.cointype.namespace.eth
-        // We want to extract address.cointype
-        
-        // Parse through the labels
-        while (offset < name.length) {
-            uint8 labelLength = uint8(name[offset]);
-            if (labelLength == 0) break; // End of DNS name
-            
-            offset += 1 + labelLength; // Skip length byte + label data
-            labelCount++;
-            
-            // After reading two labels (address.cointype), we should be at the namespace
-            if (labelCount == 2) {
-                identifierEnd = offset;
-                break;
-            }
-        }
-        
-        if (identifierEnd == 0 || labelCount < 2) {
+        if (name.length < 10) { // Minimum for "a.b.c.eth" + null terminator
             revert InvalidAddressEncoding();
         }
         
-        // Extract the address identifier with proper null termination
+        // Parse through all labels to find the structure
+        uint256 offset = 0;
+        uint256 labelCount = 0;
+        uint256 identifierEnd = 0;
+        bool foundEth = false;
+        
+        // Parse through all labels forward
+        while (offset < name.length) {
+            uint8 labelLength = uint8(name[offset]);
+            if (labelLength == 0) {
+                foundEth = true; // Found null terminator
+                break;
+            }
+            
+            // Check if we have enough bytes for this label
+            if (offset + labelLength + 1 > name.length) {
+                revert InvalidAddressEncoding();
+            }
+            
+            labelCount++;
+            
+            // After reading two labels (address.cointype), mark the end of identifier
+            if (labelCount == 2) {
+                identifierEnd = offset + 1 + labelLength;
+            }
+            
+            // Check if this is the "eth" label (should be the last non-null label)
+            if (labelLength == 3 && 
+                name[offset + 1] == 0x65 && // 'e'
+                name[offset + 2] == 0x74 && // 't'
+                name[offset + 3] == 0x68 && // 'h'
+                offset + 4 < name.length &&
+                name[offset + 4] == 0x00) { // followed by null terminator
+                
+                foundEth = true;
+                break;
+            }
+            
+            offset += 1 + labelLength; // Move to next label
+        }
+        
+        // Validate we found proper structure: at least address.cointype.something.eth
+        if (!foundEth || labelCount < 3 || identifierEnd == 0) {
+            revert InvalidAddressEncoding();
+        }
+        
+        // Extract the address identifier (first two labels) with proper null termination
         bytes memory identifier = new bytes(identifierEnd + 1);
         for (uint256 i = 0; i < identifierEnd; i++) {
             identifier[i] = name[i];
@@ -191,9 +213,8 @@ contract ECSAddressResolver is IExtendedResolver, CCIPReader {
         bytes memory response,
         bytes memory extraData
     ) external pure returns (bytes memory) {
-        // Decode the string result from the credential resolver
+        // Credential resolvers now return strings directly, so just re-encode
         string memory result = abi.decode(response, (string));
-        // Re-encode it for the resolve function
         return abi.encode(result);
     }
     

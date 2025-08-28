@@ -1,6 +1,6 @@
 {
   "name": "ecs-star-resolution-test",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Test script for ECS star resolution via ENS",
   "main": "test_star_resolution.js",
   "type": "module",

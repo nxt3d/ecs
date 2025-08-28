@@ -57,9 +57,10 @@ contract OffchainStarAddrResolver is GatewayFetchTarget, IExtendedResolver, Acce
      * @param _credential The credential key for the text record
      * @return The result of the credential resolution
      */
-    function credential(bytes calldata identifier, string calldata _credential) external view returns (bytes memory) {
+    function credential(bytes calldata identifier, string calldata _credential) external view returns (string memory) {
         // Use the identifier directly for gateway fetch
-        return _fetchCredential(identifier, _credential);
+        bytes memory result = _fetchCredential(identifier, _credential);
+        return abi.decode(result, (string));
     }
     
     /**
