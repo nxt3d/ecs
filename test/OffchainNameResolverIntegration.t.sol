@@ -2,21 +2,24 @@
 pragma solidity ^0.8.27;
 
 import "forge-std/Test.sol";
-import "../src/credentials/ethstars/OffchainStarNameResolver.sol";
+import "../src/credentials/ethstars/OffchainStarName.sol";
+import "../src/OffchainNameResolver.sol";
 import {IGatewayVerifier} from "../lib/unruggable-gateways/contracts/IGatewayVerifier.sol";
 import {GatewayRequest} from "../lib/unruggable-gateways/contracts/GatewayRequest.sol";
 import "../src/utils/NameCoder.sol";
+import "../src/ICredentialResolverOffchain.sol";
+import "../src/ICredentialResolver.sol";
 
 /**
  * @title OffchainStarNameResolverIntegrationTest
  * @dev Full end-to-end integration tests for OffchainStarNameResolver.sol
  * @notice Uses real gateway data captured from Sepolia testnet
  */
-contract OffchainStarNameResolverIntegrationTest is Test {
+contract OffchainStarNameIntegrationTest is Test {
     
     /* --- Test Contracts --- */
     
-    OffchainStarNameResolver public nameResolver;
+    OffchainStarName public nameResolver;
     MockGatewayVerifier public mockVerifier;
     
     /* --- Test Constants --- */
@@ -54,7 +57,7 @@ contract OffchainStarNameResolverIntegrationTest is Test {
         mockVerifier = new MockGatewayVerifier();
         
         // Deploy resolver with mock verifier
-        nameResolver = new OffchainStarNameResolver(IGatewayVerifier(address(mockVerifier)), MOCK_TARGET_L2);
+        nameResolver = new OffchainStarName(IGatewayVerifier(address(mockVerifier)), MOCK_TARGET_L2);
         
         vm.stopPrank();
         
@@ -84,81 +87,53 @@ contract OffchainStarNameResolverIntegrationTest is Test {
     /* --- Constructor Tests --- */
     
     function test_001____constructor_________________InitializesCorrectly() public view {
-        // Test OffchainStarNameResolver initialization
+        // Test OffchainStarName initialization
         assertTrue(nameResolver.hasRole(nameResolver.DEFAULT_ADMIN_ROLE(), admin));
         assertTrue(nameResolver.hasRole(nameResolver.ADMIN_ROLE(), admin));
     }
     
     /* --- Name Resolver Integration Tests --- */
     
-    function test_002____resolve__________________TriggersCCIPReadRevert() public {
-        // This test verifies that the OffchainStarNameResolver correctly triggers ERC3668 OffchainLookup
+    function test_002____credential_______________TriggersCCIPReadRevert() public {
+        // This test verifies that the OffchainStarName correctly triggers ERC3668 OffchainLookup
         // when resolving a name-based credential (CCIP-Read revert)
         
         vm.expectRevert(); // Should revert with ERC3668 OffchainLookup error
-        nameResolver.resolve(nameTestData.dnsEncodedName, nameTestData.textFunctionData);
+        nameResolver.credential(nameTestData.dnsEncodedName, nameTestData.textRecordKey);
     }
     
-    function test_002b___resolve__________________RevertsWithSpecificOffchainLookupError() public {
-        // This test verifies that the resolver correctly triggers ERC3668 OffchainLookup error
-        // with the proper error structure for CCIP-Read
-        
-        vm.expectRevert(); // Expect ERC3668 OffchainLookup error
-        nameResolver.resolve(nameTestData.dnsEncodedName, nameTestData.textFunctionData);
-    }
-    
-    function test_003____resolve__________________ParsesNameIdentifierCorrectly() public {
-        // Test the internal name identifier parsing logic
-        // This verifies that vitalik.eth.name.ecs.eth correctly extracts "vitalik.eth"
-        
-        // We can't directly test the internal function, but we can verify the behavior
-        // by checking that the resolve call processes the name correctly and triggers CCIP-Read
-        vm.expectRevert(); // Should revert with ERC3668 OffchainLookup (not InvalidDNSEncoding)
-        nameResolver.resolve(nameTestData.dnsEncodedName, nameTestData.textFunctionData);
-    }
-    
-    function test_004____resolveCallback__________CallbackDecodesResultCorrectly() public {
-        // Test the resolveCallback function with real gateway data
+    function test_004____credentialCallback_______CallbackDecodesResultCorrectly() public {
+        // Test the credentialCallback function with real gateway data
         
         bytes[] memory values = new bytes[](1);
         values[0] = abi.encode(uint256(2)); // The expected result from gateway
         
-        bytes memory result = nameResolver.resolveCallback(values, 0, "");
+        bytes memory result = nameResolver.credentialCallback(values, 0, "");
         string memory decodedResult = abi.decode(result, (string));
         
         assertEq(decodedResult, nameTestData.expectedResult);
     }
     
-    function test_005____resolve__________________HandlesInvalidDNSEncodingCorrectly() public {
+    function test_005____credential_______________HandlesInvalidDNSEncodingCorrectly() public {
         // Test with invalid DNS encoding
         bytes memory invalidDns = hex"ff"; // Invalid DNS encoding
         
-        vm.expectRevert(OffchainStarNameResolver.InvalidDNSEncoding.selector);
-        nameResolver.resolve(invalidDns, nameTestData.textFunctionData);
-    }
-    
-    function test_005b___resolve__________________RevertsInvalidDNSEncodingWithShortName() public {
-        // Test with DNS name that's too short (less than minimum required length)
-        bytes memory shortDns = hex"00"; // Just null terminator
-        
-        vm.expectRevert(OffchainStarNameResolver.InvalidDNSEncoding.selector);
-        nameResolver.resolve(shortDns, nameTestData.textFunctionData);
-    }
-    
-    function test_006____resolve__________________RejectsUnsupportedFunctions() public {
-        // Test with unsupported function selector
-        bytes memory unsupportedCall = hex"12345678"; // Invalid function selector
-        
-        vm.expectRevert(abi.encodeWithSelector(OffchainStarNameResolver.UnsupportedFunction.selector, bytes4(0x12345678)));
-        nameResolver.resolve(nameTestData.dnsEncodedName, unsupportedCall);
+        vm.expectRevert(abi.encodeWithSelector(NameCoder.DNSDecodingFailed.selector, invalidDns));
+        nameResolver.credential(invalidDns, nameTestData.textRecordKey);
     }
     
     /* --- ERC165 Interface Tests --- */
     
     function test_007____supportsInterface________SupportsCorrectInterfaces() public view {
-        // Test OffchainStarNameResolver interfaces
-        assertTrue(nameResolver.supportsInterface(type(IExtendedResolver).interfaceId));
-        assertTrue(nameResolver.supportsInterface(0x01ffc9a7)); // ERC165
+        // Test OffchainStarName interfaces
+        // Check each interface individually to see which one fails
+        bool supportsOffchain = nameResolver.supportsInterface(type(ICredentialResolverOffchain).interfaceId);
+        bool supportsCredential = nameResolver.supportsInterface(type(ICredentialResolver).interfaceId);
+        bool supportsERC165 = nameResolver.supportsInterface(0x01ffc9a7);
+        
+        assertTrue(supportsCredential, "Should support ICredentialResolver");
+        assertTrue(supportsOffchain, "Should support ICredentialResolverOffchain");
+        assertTrue(supportsERC165, "Should support ERC165");
     }
     
     /* --- Access Control Tests --- */
@@ -174,31 +149,31 @@ contract OffchainStarNameResolverIntegrationTest is Test {
     
     /* --- Edge Case Tests --- */
     
-    function test_009____resolveCallback__________HandlesEmptyCallbackValues() public {
+    function test_009____credentialCallback_______HandlesEmptyCallbackValues() public {
         // Test callback with empty values array
         bytes[] memory emptyValues = new bytes[](0);
         
         vm.expectRevert("No values provided");
-        nameResolver.resolveCallback(emptyValues, 0, "");
+        nameResolver.credentialCallback(emptyValues, 0, "");
     }
     
-    function test_010____resolveCallback__________HandlesZeroValueCallback() public {
+    function test_010____credentialCallback_______HandlesZeroValueCallback() public {
         // Test callback with zero value
         bytes[] memory values = new bytes[](1);
         values[0] = abi.encode(uint256(0));
         
-        bytes memory result = nameResolver.resolveCallback(values, 0, "");
+        bytes memory result = nameResolver.credentialCallback(values, 0, "");
         string memory decodedResult = abi.decode(result, (string));
         
         assertEq(decodedResult, "0");
     }
     
-    function test_011____resolveCallback__________HandlesLargeValueCallback() public {
+    function test_011____credentialCallback_______HandlesLargeValueCallback() public {
         // Test callback with large value
         bytes[] memory values = new bytes[](1);
         values[0] = abi.encode(uint256(999999999));
         
-        bytes memory result = nameResolver.resolveCallback(values, 0, "");
+        bytes memory result = nameResolver.credentialCallback(values, 0, "");
         string memory decodedResult = abi.decode(result, (string));
         
         assertEq(decodedResult, "999999999");
@@ -229,7 +204,7 @@ contract OffchainStarNameResolverIntegrationTest is Test {
         MockVerifyingGatewayVerifier verifyingVerifier = new MockVerifyingGatewayVerifier();
         
         // Deploy a new resolver with the verifying verifier
-        OffchainStarNameResolver verifyingResolver = new OffchainStarNameResolver(
+        OffchainStarName verifyingResolver = new OffchainStarName(
             IGatewayVerifier(address(verifyingVerifier)), 
             MOCK_TARGET_L2
         );
@@ -239,7 +214,7 @@ contract OffchainStarNameResolverIntegrationTest is Test {
         bytes[] memory values = new bytes[](1);
         values[0] = abi.encode(uint256(2)); // Expected result from verification
         
-        bytes memory result = verifyingResolver.resolveCallback(values, 0, "");
+        bytes memory result = verifyingResolver.credentialCallback(values, 0, "");
         string memory decodedResult = abi.decode(result, (string));
         
         assertEq(decodedResult, nameTestData.expectedResult);
@@ -253,7 +228,7 @@ contract OffchainStarNameResolverIntegrationTest is Test {
         RealProofVerifyingGatewayVerifier realProofVerifier = new RealProofVerifyingGatewayVerifier();
         
         // Deploy a new resolver with the real proof verifier
-        OffchainStarNameResolver realProofResolver = new OffchainStarNameResolver(
+        OffchainStarName realProofResolver = new OffchainStarName(
             IGatewayVerifier(address(realProofVerifier)), 
             MOCK_TARGET_L2
         );
@@ -266,7 +241,7 @@ contract OffchainStarNameResolverIntegrationTest is Test {
         bytes[] memory values = new bytes[](1);
         values[0] = abi.encode(uint256(2)); // Verified result from real proof
         
-        bytes memory result = realProofResolver.resolveCallback(values, 0, "");
+        bytes memory result = realProofResolver.credentialCallback(values, 0, "");
         string memory decodedResult = abi.decode(result, (string));
         
         assertEq(decodedResult, nameTestData.expectedResult);

@@ -7,7 +7,7 @@ import "../src/ECSRegistrarController.sol";
 import "../src/ECSAddressResolver.sol";
 import "../src/RootController.sol";
 import "../src/credentials/ethstars/StarResolver.sol";
-import "../src/credentials/ethstars/OffchainStarAddrResolver.sol";
+import "../src/credentials/ethstars/OffchainStarAddr.sol";
 import {IGatewayVerifier} from "../lib/unruggable-gateways/contracts/IGatewayVerifier.sol";
 import {GatewayRequest} from "../lib/unruggable-gateways/contracts/GatewayRequest.sol";
 import "../src/utils/NameCoder.sol";
@@ -21,7 +21,7 @@ contract StarResolverIntegrationTest is Test {
     ECSAddressResolver public resolver;
     RootController public rootController;
     StarResolver public starResolver;
-    OffchainStarAddrResolver public starResolverOffchain;
+    OffchainStarAddr public starResolverOffchain;
     
     /* --- Test Data --- */
     
@@ -194,7 +194,7 @@ contract StarResolverIntegrationTest is Test {
         
         // Mock gateway verifier for testing
         MockGatewayVerifier mockVerifier = new MockGatewayVerifier();
-        starResolverOffchain = new OffchainStarAddrResolver(IGatewayVerifier(address(mockVerifier)), address(0x1234));
+        starResolverOffchain = new OffchainStarAddr(IGatewayVerifier(address(mockVerifier)), address(0x1234));
         
         vm.stopPrank();
         

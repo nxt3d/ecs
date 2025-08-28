@@ -7,8 +7,8 @@ import "../src/ECSRegistrarController.sol";
 import "../src/ECSAddressResolver.sol";
 import "../src/ECSNameResolver.sol";
 import "../src/RootController.sol";
-import "../src/credentials/ethstars/OffchainStarAddrResolver.sol";
-import "../src/credentials/ethstars/OffchainStarNameResolver.sol";
+import "../src/credentials/ethstars/OffchainStarAddr.sol";
+import "../src/credentials/ethstars/OffchainStarName.sol";
 import {IGatewayVerifier} from "../lib/unruggable-gateways/contracts/IGatewayVerifier.sol";
 
 import "../src/utils/NameCoder.sol";
@@ -29,8 +29,8 @@ contract DeployECS is Script {
     ECSAddressResolver public addressResolver;
     ECSNameResolver public nameResolver;
     RootController public rootController;
-    OffchainStarAddrResolver public starResolver;
-    OffchainStarNameResolver public starNameResolver;
+    OffchainStarAddr public starResolver;
+    OffchainStarName public starNameResolver;
     
     /* --- Configuration --- */
     
@@ -122,12 +122,12 @@ contract DeployECS is Script {
         
         // Step 6: Deploy offchain star credential resolvers
         console.log("\n6. Deploying offchain star credential resolvers...");
-        starResolver = new OffchainStarAddrResolver(IGatewayVerifier(GATEWAY_VERIFIER), BASE_ADDR_TARGET);
-        console.log("   OffchainStarAddrResolver deployed at:", address(starResolver));
+        starResolver = new OffchainStarAddr(IGatewayVerifier(GATEWAY_VERIFIER), BASE_ADDR_TARGET);
+        console.log("   OffchainStarAddr deployed at:", address(starResolver));
         console.log("   -> Points to StarResolver on Base:", BASE_ADDR_TARGET);
         
-        starNameResolver = new OffchainStarNameResolver(IGatewayVerifier(GATEWAY_VERIFIER), BASE_NAME_TARGET);
-        console.log("   OffchainStarNameResolver deployed at:", address(starNameResolver));
+        starNameResolver = new OffchainStarName(IGatewayVerifier(GATEWAY_VERIFIER), BASE_NAME_TARGET);
+        console.log("   OffchainStarName deployed at:", address(starNameResolver));
         console.log("   -> Points to StarNameResolver on Base:", BASE_NAME_TARGET);
         
         // Step 7: Register ethstars namespace
@@ -188,8 +188,8 @@ contract DeployECS is Script {
         console.log("  - ECSNameResolver:", address(nameResolver));
         
         console.log("\nOffchain Star Credential Resolvers:");
-        console.log("  - OffchainStarAddrResolver (address-based):", address(starResolver));
-        console.log("  - OffchainStarNameResolver (name-based):", address(starNameResolver));
+        console.log("  - OffchainStarAddr (address-based):", address(starResolver));
+        console.log("  - OffchainStarName (name-based):", address(starNameResolver));
         
         console.log("\nDomain Structure:");
         console.log("  - Root node (0x0000...): owned by RootController");
@@ -198,13 +198,13 @@ contract DeployECS is Script {
         
         console.log("\nNamespace Setup:");
         console.log("  - ethstars namespace:", vm.toString(ethstarsNamespace), "registered for 1 year");
-        console.log("  - OffchainStarAddrResolver set in ECSAddressResolver for ethstars");
-        console.log("  - OffchainStarNameResolver set in ECSNameResolver for ethstars");
+        console.log("  - OffchainStarAddr set in ECSAddressResolver for ethstars");
+        console.log("  - OffchainStarName set in ECSNameResolver for ethstars");
         
         string memory textRecordKey = string.concat("eth.", ECS_DOMAIN, ".ethstars.stars");
         console.log("\nReady to Use:");
-        console.log("1. Query address stars via offchain resolution: OffchainStarAddrResolver.resolve()");
-        console.log("2. Query domain stars via offchain resolution: OffchainStarNameResolver.resolve()");
+        console.log("1. Query address stars via offchain resolution: OffchainStarAddr.resolve()");
+        console.log("2. Query domain stars via offchain resolution: OffchainStarName.resolve()");
         console.log(string.concat("3. Query stars via ENS: resolver.text(node, '", textRecordKey, "')"));
         console.log("4. Data is fetched from Base Sepolia L2 via gateway verifier");
         

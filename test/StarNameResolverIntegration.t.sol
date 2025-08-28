@@ -8,7 +8,7 @@ import "../src/ECSNameResolver.sol";
 import "../src/RootController.sol";
 import "../src/credentials/ethstars/StarNameResolver.sol";
 import "../src/utils/NameCoder.sol";
-import "../src/credentials/ethstars/OffchainStarNameResolver.sol";
+import "../src/credentials/ethstars/OffchainStarName.sol";
 import {IGatewayVerifier} from "../lib/unruggable-gateways/contracts/IGatewayVerifier.sol";
 import {GatewayRequest} from "../lib/unruggable-gateways/contracts/GatewayRequest.sol";
 
@@ -21,7 +21,7 @@ contract StarNameResolverIntegrationTest is Test {
     ECSNameResolver public resolver;
     RootController public rootController;
     StarNameResolver public starNameResolver;
-    OffchainStarNameResolver public starNameResolverOffchain;
+    OffchainStarName public starNameResolverOffchain;
     
     /* --- Test Data --- */
     
@@ -74,7 +74,7 @@ contract StarNameResolverIntegrationTest is Test {
         starNameResolver = new StarNameResolver(); // No parameters
         // Mock gateway verifier for testing
         MockGatewayVerifier mockVerifier = new MockGatewayVerifier();
-        starNameResolverOffchain = new OffchainStarNameResolver(IGatewayVerifier(address(mockVerifier)), address(0x1234));
+        starNameResolverOffchain = new OffchainStarName(IGatewayVerifier(address(mockVerifier)), address(0x1234));
         
         // Set up roles
         registry.grantRole(registry.CONTROLLER_ROLE(), address(controller));

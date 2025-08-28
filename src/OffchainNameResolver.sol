@@ -1,17 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
- 
 import {GatewayFetcher, GatewayRequest} from "@unruggable/contracts/GatewayFetcher.sol";
 import {GatewayFetchTarget, IGatewayVerifier} from "@unruggable/contracts/GatewayFetchTarget.sol";
-import {IExtendedResolver} from "../../IExtendedResolver.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "../../utils/NameCoder.sol";
+import "./utils/NameCoder.sol";
+import "./ICredentialResolverOffchain.sol";
+import "./ICredentialResolver.sol";
 
-contract OffchainStarNameResolver is GatewayFetchTarget, AccessControl, IExtendedResolver {
-
-	using GatewayFetcher for GatewayRequest;
+/**
+ * @title OffchainNameResolver
+ * @dev Abstract base contract for offchain name-based resolvers
+ * @notice This contract provides common functionality for resolving name-based ENS names
+ * using gateway fetching. Concrete implementations only need to implement the credential
+ * function and optionally override _fetchCredential for custom logic.
+ */
+abstract contract OffchainNameResolver is GatewayFetchTarget, ICredentialResolverOffchain, AccessControl {
+    
+    using GatewayFetcher for GatewayRequest;
 
     /* --- Errors --- */
 
@@ -22,6 +29,7 @@ contract OffchainStarNameResolver is GatewayFetchTarget, AccessControl, IExtende
     error InvalidDNSEncoding();
 
     /* --- Events --- */
+
     event TextRecordKeyUpdated(string oldKey, string newKey);
 
     /* --- Roles --- */
@@ -30,8 +38,8 @@ contract OffchainStarNameResolver is GatewayFetchTarget, AccessControl, IExtende
 
     /* --- Storage --- */
 
-	IGatewayVerifier immutable _verifier;
-	address immutable _targetL2Address;
+    IGatewayVerifier immutable _verifier;
+    address immutable _targetL2Address;
 
     /* --- Constructor --- */
     
@@ -39,77 +47,24 @@ contract OffchainStarNameResolver is GatewayFetchTarget, AccessControl, IExtende
     /// @param verifier The gateway verifier contract.
     /// @param targetL2Address The target L2 address for offchain resolution.
     /// @notice This contract is designed to be used with a specific verifier and target address.
-
-	constructor(IGatewayVerifier verifier, address targetL2Address) {
-		_verifier = verifier;
+    constructor(IGatewayVerifier verifier, address targetL2Address) {
+        _verifier = verifier;
         _targetL2Address = targetL2Address;
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(ADMIN_ROLE, msg.sender);
-	}
+    }
     
     /* --- Resolution --- */
 
     /**
-     * @dev Credential function that directly uses the provided identifier
+     * @dev Abstract credential function that must be implemented by concrete contracts
      * @param identifier The DNS-encoded identifier (already extracted domain)
      * @param _credential The credential key for the text record
      * @return The result of the credential resolution
      */
-    function credential(bytes calldata identifier, string calldata _credential) external view returns (bytes memory) {
-        // Use the identifier directly for gateway fetch
-        return _fetchCredential(identifier, _credential);
-    }
-
-    /**
-     * @dev Resolve credentials for an address-based ENS name
-     * @param name The DNS-encoded name
-     * @param data The resolver function call data
-     * @return The result of the resolver call
-     */
-    function resolve(bytes calldata name, bytes calldata data) external view returns (bytes memory) {
-        
-        bytes4 selector = bytes4(data);
-        
-        // Only support text(bytes32,string) function
-        if (selector != 0x59d1d43c) { // text(bytes32,string) selector
-            revert UnsupportedFunction(selector);
-        }
-        
-        // Decode the function call to get the key
-        (, string memory key) = abi.decode(data[4:], (bytes32, string));
-        
-        
-        // Extract the name identifier from the DNS name
-        bytes memory nameIdentifier = _extractNameIdentifier(name);
-
-        // Use the extracted identifier for gateway fetch
-        return _fetchCredential(nameIdentifier, key);    
-
-    }
-
-    /**
-     * @dev Internal function to fetch credential using gateway
-     * @param nameIdentifier The DNS-encoded domain identifier
-     * @param key The credential key for the text record
-     * @return The result of the gateway fetch
-     */
-    function _fetchCredential(bytes memory nameIdentifier, string memory key) internal view returns (bytes memory) {
-        // Compute namehash directly from DNS-encoded identifier using NameCoder
-        bytes32 namehash = NameCoder.namehash(nameIdentifier, 0);
-
-        GatewayRequest memory r = GatewayFetcher
-            .newRequest(1)
-            .setTarget(_targetL2Address)
-            .setSlot(3)
-            .push(namehash)
-            .follow()
-            .read()
-            .setOutput(0);
-
-		fetch(_verifier, r, this.resolveCallback.selector);
-    }
-
+    function credential(bytes calldata identifier, string calldata _credential) external view virtual returns (string memory);
+    
     /**
      * @dev Extract domain identifier from DNS name
      * Expected format: domain.com.name.ecs.eth
@@ -195,31 +150,21 @@ contract OffchainStarNameResolver is GatewayFetchTarget, AccessControl, IExtende
         
         // If we reach here, no valid pattern was found
         revert InvalidDNSEncoding();
-    } 
-
-    /* --- Callback --- */
+    }
 
     /**
-     * @dev Callback function for the gateway fetcher
-     * @param values The values returned from the gateway fetcher
-     * @param extraData The extra data passed to the callback
-     * @return The result of the callback
+     * @dev Abstract callback function that must be implemented by concrete contracts
+     * @param values The values returned from the gateway
+     * @param extraData Additional data from the gateway
+     * @return The encoded result
      */
-    function resolveCallback(bytes[] calldata values, uint8, bytes calldata extraData) external pure returns (bytes memory) {
-        require(values.length > 0, "No values provided");
-        
-        // Convert bytes to uint256, then to string
-        uint256 value = uint256(bytes32(values[0]));
-        string memory stars = Strings.toString(value);
-        return abi.encode(stars);
-	}
+    function credentialCallback(bytes[] calldata values, uint8, bytes calldata extraData) external view virtual returns (bytes memory);
     
-
-
     /* --- ERC165 Support --- */
     
     function supportsInterface(bytes4 interfaceId) public override view virtual returns (bool) {
-        return interfaceId == type(IExtendedResolver).interfaceId || super.supportsInterface(interfaceId); // ERC165 interface ID
-
+        return interfaceId == type(ICredentialResolverOffchain).interfaceId || 
+               interfaceId == type(ICredentialResolver).interfaceId || 
+               super.supportsInterface(interfaceId);
     }
 }
