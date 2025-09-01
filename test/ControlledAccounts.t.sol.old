@@ -147,8 +147,6 @@ contract ControlledAccountsTest is Test {
     function test_001____constructor_________________InitializesCorrectly() public view {
         // Test default values
         assertEq(controlledAccounts.textRecordKey(), DEFAULT_TEXT_RECORD_KEY);
-        assertEq(controlledAccounts.maxControlledAccounts(), DEFAULT_MAX_CONTROLLED_ACCOUNTS);
-        assertEq(controlledAccounts.MIN_MAX_CONTROLLED_ACCOUNTS(), MIN_MAX_CONTROLLED_ACCOUNTS);
         
         // Test role assignments
         assertTrue(controlledAccounts.hasRole(controlledAccounts.DEFAULT_ADMIN_ROLE(), admin));
@@ -157,7 +155,98 @@ contract ControlledAccountsTest is Test {
     
     /* --- declareControlledAccounts Function Tests --- */
     
-    function test_002____declareControlledAccounts___DeclaresSingleAccountSuccessfully() public {
+    /* --- declareControlledAccount Function Tests --- */
+    
+    function test_002____declareControlledAccount____DeclaresSingleAccountSuccessfully() public {
+        vm.startPrank(user1);
+        
+        vm.expectEmit(true, false, false, true);
+        address[] memory expectedAccounts = new address[](1);
+        expectedAccounts[0] = CONTROLLED_ACCOUNT_1;
+        emit ControlledAccounts.ControlledAccountsDeclared(user1, expectedAccounts);
+        
+        controlledAccounts.declareControlledAccount(CONTROLLED_ACCOUNT_1);
+        
+        vm.stopPrank();
+        
+        // Verify controlled account
+        address[] memory declaredAccounts = controlledAccounts.getControlledAccounts(user1);
+        assertEq(declaredAccounts.length, 1);
+        assertEq(declaredAccounts[0], CONTROLLED_ACCOUNT_1);
+        
+        // Verify isControlledAccount
+        assertTrue(controlledAccounts.isControlledAccount(user1, CONTROLLED_ACCOUNT_1));
+    }
+    
+    function test_003____declareControlledAccount____RevertsForZeroAddress() public {
+        vm.startPrank(user1);
+        
+        vm.expectRevert("Invalid account address");
+        controlledAccounts.declareControlledAccount(address(0));
+        
+        vm.stopPrank();
+        
+        // Verify no accounts were added
+        address[] memory declaredAccounts = controlledAccounts.getControlledAccounts(user1);
+        assertEq(declaredAccounts.length, 0);
+    }
+    
+    function test_004____declareControlledAccount____RevertsForSelfControl() public {
+        vm.startPrank(user1);
+        
+        vm.expectRevert("Cannot control self");
+        controlledAccounts.declareControlledAccount(user1);
+        
+        vm.stopPrank();
+        
+        // Verify no accounts were added
+        address[] memory declaredAccounts = controlledAccounts.getControlledAccounts(user1);
+        assertEq(declaredAccounts.length, 0);
+    }
+    
+    function test_005____declareControlledAccount____RevertsForAlreadyControlledAccount() public {
+        // First declaration succeeds
+        vm.startPrank(user1);
+        controlledAccounts.declareControlledAccount(CONTROLLED_ACCOUNT_1);
+        vm.stopPrank();
+        
+        // Second declaration by same user fails
+        vm.startPrank(user1);
+        vm.expectRevert(ControlledAccounts.AccountAlreadyControlled.selector);
+        controlledAccounts.declareControlledAccount(CONTROLLED_ACCOUNT_1);
+        vm.stopPrank();
+        
+        // Verify only one account was added
+        address[] memory declaredAccounts = controlledAccounts.getControlledAccounts(user1);
+        assertEq(declaredAccounts.length, 1);
+        assertEq(declaredAccounts[0], CONTROLLED_ACCOUNT_1);
+    }
+    
+    function test_006____declareControlledAccount____AllowsMultipleCallsForDifferentAccounts() public {
+        vm.startPrank(user1);
+        
+        // Add first account
+        controlledAccounts.declareControlledAccount(CONTROLLED_ACCOUNT_1);
+        
+        // Add second account
+        controlledAccounts.declareControlledAccount(CONTROLLED_ACCOUNT_2);
+        
+        vm.stopPrank();
+        
+        // Verify both accounts were added
+        address[] memory declaredAccounts = controlledAccounts.getControlledAccounts(user1);
+        assertEq(declaredAccounts.length, 2);
+        assertEq(declaredAccounts[0], CONTROLLED_ACCOUNT_1);
+        assertEq(declaredAccounts[1], CONTROLLED_ACCOUNT_2);
+        
+        // Verify isControlledAccount for both
+        assertTrue(controlledAccounts.isControlledAccount(user1, CONTROLLED_ACCOUNT_1));
+        assertTrue(controlledAccounts.isControlledAccount(user1, CONTROLLED_ACCOUNT_2));
+    }
+    
+    /* --- declareControlledAccounts Function Tests --- */
+    
+    function test_007____declareControlledAccounts___DeclaresSingleAccountSuccessfully() public {
         address[] memory accounts = new address[](1);
         accounts[0] = CONTROLLED_ACCOUNT_1;
         

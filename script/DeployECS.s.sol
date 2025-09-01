@@ -9,6 +9,7 @@ import "../src/ECSNameResolver.sol";
 import "../src/RootController.sol";
 import "../src/credentials/ethstars/OffchainStarAddr.sol";
 import "../src/credentials/ethstars/OffchainStarName.sol";
+import "../src/credentials/controlled-accounts/OffchainControlledAccounts.sol";
 import {IGatewayVerifier} from "../lib/unruggable-gateways/contracts/IGatewayVerifier.sol";
 
 import "../src/utils/NameCoder.sol";
@@ -31,6 +32,7 @@ contract DeployECS is Script {
     RootController public rootController;
     OffchainStarAddr public starResolver;
     OffchainStarName public starNameResolver;
+    OffchainControlledAccounts public controlledAccountsResolver;
     
     /* --- Configuration --- */
     
@@ -44,10 +46,17 @@ contract DeployECS is Script {
     uint256 constant REGISTRATION_DURATION = 365 days;
     
     // Gateway configuration for offchain resolvers
-    // These should be configured based on the target network
-    address constant GATEWAY_VERIFIER = 0x8e77b311bed6906799BD3CaFBa34c13b64CAF460; // Base Sepolia verifier
-    address constant BASE_ADDR_TARGET = 0x4dbccAF1dc6c878EBe3CE8041886dDb36D339cA7;  // StarResolver on Base Sepolia
-    address constant BASE_NAME_TARGET = 0x69f3E82bA7c4B640a3b2c0FD5eA67cDA86bE8F88;  // StarNameResolver on Base Sepolia
+    // These addresses will be set based on environment variables or defaults
+    address public GATEWAY_VERIFIER;
+    address public BASE_STAR_ADDR_TARGET;
+    address public BASE_STAR_NAME_TARGET; 
+    address public BASE_CONTROLLED_ACCOUNTS_TARGET;
+    
+    // Default addresses for Base Sepolia (testnet)
+    address constant DEFAULT_GATEWAY_VERIFIER = 0x8e77b311bed6906799BD3CaFBa34c13b64CAF460;
+    address constant DEFAULT_BASE_STAR_ADDR = 0x4dbccAF1dc6c878EBe3CE8041886dDb36D339cA7;
+    address constant DEFAULT_BASE_STAR_NAME = 0x69f3E82bA7c4B640a3b2c0FD5eA67cDA86bE8F88;
+    address constant DEFAULT_BASE_CONTROLLED_ACCOUNTS = address(0); // To be set after deployment
     
     /* --- Deployment Function --- */
     
@@ -58,6 +67,9 @@ contract DeployECS is Script {
         } catch {
             ECS_DOMAIN = "ecs"; // Default
         }
+        
+        // Set gateway configuration from environment variables or use defaults
+        _setGatewayConfiguration();
         
         vm.startBroadcast();
         
@@ -120,28 +132,49 @@ contract DeployECS is Script {
         nameResolver = new ECSNameResolver(registry);
         console.log("   ECSNameResolver deployed at:", address(nameResolver));
         
-        // Step 6: Deploy offchain star credential resolvers
-        console.log("\n6. Deploying offchain star credential resolvers...");
-        starResolver = new OffchainStarAddr(IGatewayVerifier(GATEWAY_VERIFIER), BASE_ADDR_TARGET);
+        // Step 6: Deploy offchain credential resolvers
+        console.log("\n6. Deploying offchain credential resolvers...");
+        
+        // Deploy star credential resolvers
+        starResolver = new OffchainStarAddr(IGatewayVerifier(GATEWAY_VERIFIER), BASE_STAR_ADDR_TARGET);
         console.log("   OffchainStarAddr deployed at:", address(starResolver));
-        console.log("   -> Points to StarResolver on Base:", BASE_ADDR_TARGET);
+        console.log("   -> Points to StarResolver on Base:", BASE_STAR_ADDR_TARGET);
         
-        starNameResolver = new OffchainStarName(IGatewayVerifier(GATEWAY_VERIFIER), BASE_NAME_TARGET);
+        starNameResolver = new OffchainStarName(IGatewayVerifier(GATEWAY_VERIFIER), BASE_STAR_NAME_TARGET);
         console.log("   OffchainStarName deployed at:", address(starNameResolver));
-        console.log("   -> Points to StarNameResolver on Base:", BASE_NAME_TARGET);
+        console.log("   -> Points to StarNameResolver on Base:", BASE_STAR_NAME_TARGET);
         
-        // Step 7: Register ethstars namespace
-        console.log("\n7. Registering ethstars namespace...");
+        // Deploy controlled accounts resolver (if target is configured)
+        if (BASE_CONTROLLED_ACCOUNTS_TARGET != address(0)) {
+            controlledAccountsResolver = new OffchainControlledAccounts(IGatewayVerifier(GATEWAY_VERIFIER), BASE_CONTROLLED_ACCOUNTS_TARGET);
+            console.log("   OffchainControlledAccounts deployed at:", address(controlledAccountsResolver));
+            console.log("   -> Points to ControlledAccounts on Base:", BASE_CONTROLLED_ACCOUNTS_TARGET);
+        } else {
+            console.log("   OffchainControlledAccounts: Skipped (no target address configured)");
+        }
+        
+        // Step 7: Register credential namespaces
+        console.log("\n7. Registering credential namespaces...");
         uint256 registrationCost = controller.calculateFee(REGISTRATION_DURATION);
-        console.log("   Registration cost:", registrationCost);
+        console.log("   Registration cost per namespace:", registrationCost);
+        
+        // Register ethstars namespace
         bytes32 ethstarsNamespace = controller.registerNamespace{value: registrationCost}("ethstars", REGISTRATION_DURATION);
         console.log("   Namespace 'ethstars' registered for 1 year");
         console.log("   Ethstars namespace hash:", vm.toString(ethstarsNamespace));
         
+        // Register controlled-accounts namespace (if resolver is deployed)
+        bytes32 controlledAccountsNamespace;
+        if (address(controlledAccountsResolver) != address(0)) {
+            controlledAccountsNamespace = controller.registerNamespace{value: registrationCost}("controlled-accounts", REGISTRATION_DURATION);
+            console.log("   Namespace 'controlled-accounts' registered for 1 year");
+            console.log("   Controlled-accounts namespace hash:", vm.toString(controlledAccountsNamespace));
+        }
+        
         // Step 8: Set up credential resolvers
         console.log("\n8. Setting up credential resolvers...");
         
-        // First create the stars.ethstars.ecs.eth namespace
+        // Set up ethstars credential resolvers
         console.log("   Creating stars.ethstars.ecs.eth namespace...");
         bytes32 starsCredentialNamespace = registry.setSubnameOwner(
             "stars", 
@@ -158,22 +191,73 @@ contract DeployECS is Script {
         nameResolver.setCredentialResolver("stars.ethstars.ecs.eth", address(starNameResolver));
         console.log("   StarNameResolver set in ECSNameResolver for stars.ethstars.ecs.eth");
         
+        // Set up controlled-accounts credential resolvers (if available)
+        if (address(controlledAccountsResolver) != address(0)) {
+            console.log("   Creating accounts.controlled-accounts.ecs.eth namespace...");
+            bytes32 accountsCredentialNamespace = registry.setSubnameOwner(
+                "accounts", 
+                "controlled-accounts.ecs.eth", 
+                msg.sender, 
+                type(uint256).max, 
+                false
+            );
+            console.log("   Accounts credential namespace created:", vm.toString(accountsCredentialNamespace));
+            
+            addressResolver.setCredentialResolver("accounts.controlled-accounts.ecs.eth", address(controlledAccountsResolver));
+            console.log("   ControlledAccountsResolver set in ECSAddressResolver for accounts.controlled-accounts.ecs.eth");
+        }
+        
         // Step 9: Note about offchain resolution
         console.log("\n9. Offchain resolution configured...");
-        console.log("   Resolvers will fetch data from Base Sepolia via gateway verifier");
+        console.log("   Resolvers will fetch data from Base network via gateway verifier");
         console.log("   Gateway verifier:", GATEWAY_VERIFIER);
         
         vm.stopBroadcast();
         
         // Step 10: Print deployment summary
-        _printDeploymentSummary(deployer, ethNode, ecsNode, ethstarsNamespace);
+        _printDeploymentSummary(deployer, ethNode, ecsNode, ethstarsNamespace, controlledAccountsNamespace);
         
         console.log("\n=== DEPLOYMENT COMPLETE ===\n");
     }
     
     /* --- Helper Functions --- */
     
-    function _printDeploymentSummary(address deployer, bytes32 ethNode, bytes32 ecsNode, bytes32 ethstarsNamespace) internal view {
+    function _setGatewayConfiguration() internal {
+        // Set gateway verifier
+        try vm.envAddress("GATEWAY_VERIFIER") returns (address envVerifier) {
+            GATEWAY_VERIFIER = envVerifier;
+        } catch {
+            GATEWAY_VERIFIER = DEFAULT_GATEWAY_VERIFIER;
+        }
+        
+        // Set Base star resolver targets
+        try vm.envAddress("BASE_STAR_ADDR_TARGET") returns (address envStarAddr) {
+            BASE_STAR_ADDR_TARGET = envStarAddr;
+        } catch {
+            BASE_STAR_ADDR_TARGET = DEFAULT_BASE_STAR_ADDR;
+        }
+        
+        try vm.envAddress("BASE_STAR_NAME_TARGET") returns (address envStarName) {
+            BASE_STAR_NAME_TARGET = envStarName;
+        } catch {
+            BASE_STAR_NAME_TARGET = DEFAULT_BASE_STAR_NAME;
+        }
+        
+        // Set Base controlled accounts target
+        try vm.envAddress("BASE_CONTROLLED_ACCOUNTS_TARGET") returns (address envControlledAccounts) {
+            BASE_CONTROLLED_ACCOUNTS_TARGET = envControlledAccounts;
+        } catch {
+            BASE_CONTROLLED_ACCOUNTS_TARGET = DEFAULT_BASE_CONTROLLED_ACCOUNTS;
+        }
+        
+        console.log("Gateway Configuration:");
+        console.log("  - Gateway Verifier:", GATEWAY_VERIFIER);
+        console.log("  - Base Star Addr Target:", BASE_STAR_ADDR_TARGET);
+        console.log("  - Base Star Name Target:", BASE_STAR_NAME_TARGET);
+        console.log("  - Base Controlled Accounts Target:", BASE_CONTROLLED_ACCOUNTS_TARGET);
+    }
+    
+    function _printDeploymentSummary(address deployer, bytes32 ethNode, bytes32 ecsNode, bytes32 ethstarsNamespace, bytes32 controlledAccountsNamespace) internal view {
         console.log("\n=== DEPLOYMENT SUMMARY ===");
         console.log("Network: Ethereum Sepolia");
         console.log("Deployer:", deployer);
@@ -187,9 +271,12 @@ contract DeployECS is Script {
         console.log("  - ECSAddressResolver:", address(addressResolver));
         console.log("  - ECSNameResolver:", address(nameResolver));
         
-        console.log("\nOffchain Star Credential Resolvers:");
-        console.log("  - OffchainStarAddr (address-based):", address(starResolver));
-        console.log("  - OffchainStarName (name-based):", address(starNameResolver));
+        console.log("\nOffchain Credential Resolvers:");
+        console.log("  - OffchainStarAddr (ethstars address-based):", address(starResolver));
+        console.log("  - OffchainStarName (ethstars name-based):", address(starNameResolver));
+        if (address(controlledAccountsResolver) != address(0)) {
+            console.log("  - OffchainControlledAccounts:", address(controlledAccountsResolver));
+        }
         
         console.log("\nDomain Structure:");
         console.log("  - Root node (0x0000...): owned by RootController");
@@ -198,15 +285,27 @@ contract DeployECS is Script {
         
         console.log("\nNamespace Setup:");
         console.log("  - ethstars namespace:", vm.toString(ethstarsNamespace), "registered for 1 year");
-        console.log("  - OffchainStarAddr set in ECSAddressResolver for ethstars");
-        console.log("  - OffchainStarName set in ECSNameResolver for ethstars");
+        console.log("  - OffchainStarAddr set in ECSAddressResolver for stars.ethstars.ecs.eth");
+        console.log("  - OffchainStarName set in ECSNameResolver for stars.ethstars.ecs.eth");
         
-        string memory textRecordKey = string.concat("eth.", ECS_DOMAIN, ".ethstars.stars");
+        if (controlledAccountsNamespace != bytes32(0)) {
+            console.log("  - controlled-accounts namespace:", vm.toString(controlledAccountsNamespace), "registered for 1 year");
+            console.log("  - OffchainControlledAccounts set in ECSAddressResolver for accounts.controlled-accounts.ecs.eth");
+        }
+        
         console.log("\nReady to Use:");
-        console.log("1. Query address stars via offchain resolution: OffchainStarAddr.resolve()");
-        console.log("2. Query domain stars via offchain resolution: OffchainStarName.resolve()");
-        console.log(string.concat("3. Query stars via ENS: resolver.text(node, '", textRecordKey, "')"));
-        console.log("4. Data is fetched from Base Sepolia L2 via gateway verifier");
+        console.log("1. Query ethstars credentials via offchain resolution");
+        console.log("2. Query controlled-accounts credentials (if deployed)");
+        console.log("3. Data is fetched from Base network via gateway verifier");
+        console.log("4. All credentials accessible via standard ENS resolution");
+        
+        console.log("\nGateway Configuration:");
+        console.log("  - Gateway Verifier:", GATEWAY_VERIFIER);
+        console.log("  - Base Star Addr Target:", BASE_STAR_ADDR_TARGET);
+        console.log("  - Base Star Name Target:", BASE_STAR_NAME_TARGET);
+        if (BASE_CONTROLLED_ACCOUNTS_TARGET != address(0)) {
+            console.log("  - Base Controlled Accounts Target:", BASE_CONTROLLED_ACCOUNTS_TARGET);
+        }
         
         console.log("\nContract Verification:");
         console.log("All contracts deployed with verification enabled.");
