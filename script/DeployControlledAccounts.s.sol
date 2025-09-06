@@ -33,6 +33,7 @@ contract DeployControlledAccounts is Script {
     address public controlled1;
     address public controlled2;
     address public controlled3;
+    address public controlled4; // New 4th account
     
     /* --- Setup --- */
     
@@ -44,11 +45,11 @@ contract DeployControlledAccounts is Script {
         controller1 = deployer;  // PUBLIC_DEPLOYER_ADDRESS as controller
         controller2 = deployer2; // PUBLIC_DEPLOYER2_ADDRESS as controller
         
-        // PUBLIC_DEPLOYER_ADDRESS controls 2 accounts: itself and PUBLIC_DEPLOYER2_ADDRESS
+        // PUBLIC_DEPLOYER_ADDRESS controls 3 accounts: itself, PUBLIC_DEPLOYER2_ADDRESS, and the 4th account
         controlled1 = deployer;   // PUBLIC_DEPLOYER_ADDRESS controls itself
         controlled2 = deployer2;  // PUBLIC_DEPLOYER_ADDRESS controls PUBLIC_DEPLOYER2_ADDRESS
-        // PUBLIC_DEPLOYER2_ADDRESS doesn't control any accounts, just verifies it has a controller
         controlled3 = address(0); // Not used - deployer2 doesn't control any accounts
+        controlled4 = address(0x1111111111111111111111111111111111111111); // 4th account (all 1s)
     }
     
     /* --- Main Deployment --- */
@@ -81,14 +82,19 @@ contract DeployControlledAccounts is Script {
     /* --- Test Data Setup --- */
     
     function _setupTestData() internal {
-        // Set up controlled accounts for PUBLIC_DEPLOYER_ADDRESS
+        // Set up controlled accounts for PUBLIC_DEPLOYER_ADDRESS (default group)
         // For testing, we can add the same address multiple times
-        address[] memory accountsToControl = new address[](3);
+        address[] memory accountsToControl = new address[](4);
         accountsToControl[0] = controlled1; // PUBLIC_DEPLOYER_ADDRESS (self-control)
         accountsToControl[1] = controlled2; // PUBLIC_DEPLOYER2_ADDRESS
         accountsToControl[2] = controlled2; // PUBLIC_DEPLOYER2_ADDRESS (duplicate for testing)
+        accountsToControl[3] = controlled4; // 4th account (all 1s)
         
         controlledAccounts.declareControlledAccounts(accountsToControl);
+        
+        // Set up the same accounts in a "main" group
+        bytes32 mainGroup = keccak256(bytes("main"));
+        controlledAccounts.declareControlledAccounts(mainGroup, accountsToControl);
         
         // Set up controller relationships
         // PUBLIC_DEPLOYER_ADDRESS sets itself as its own controller
@@ -99,7 +105,9 @@ contract DeployControlledAccounts is Script {
         
         console.log("[SUCCESS] Test data setup complete:");
         console.log("   Controller1 (PUBLIC_DEPLOYER_ADDRESS):", controller1);
-        console.log("     - Controls:", controlled1, controlled2);
+        console.log("     - Controls (default group):", controlled1, controlled2, controlled4);
+        console.log("     - Also controls (duplicate):", controlled2);
+        console.log("     - Controls (main group):", controlled1, controlled2, controlled4);
         console.log("     - Also controls (duplicate):", controlled2);
         console.log("   Controller2 (PUBLIC_DEPLOYER2_ADDRESS):", controller2);
         console.log("     - Verifies it is controlled by:", controller1);
@@ -114,8 +122,9 @@ contract DeployControlledAccounts is Script {
         console.log("[CONTRACTS] Contracts Deployed:");
         console.log("   ControlledAccounts:", address(controlledAccounts));
         console.log("");
-        console.log("[CREDENTIAL] Credential Key:");
-        console.log("   eth.ecs.controlled-accounts.accounts");
+        console.log("[CREDENTIAL] Credential Keys:");
+        console.log("   Default group: eth.ecs.controlled-accounts.accounts");
+        console.log("   Main group: eth.ecs.controlled-accounts.accounts:main");
         console.log("");
         console.log("[TESTDATA] Test Data:");
         console.log("   Controller1 (PUBLIC_DEPLOYER_ADDRESS):", controller1);
@@ -123,12 +132,18 @@ contract DeployControlledAccounts is Script {
         console.log("   Controlled1 (PUBLIC_DEPLOYER_ADDRESS - self-control):", controlled1);
         console.log("   Controlled2 (PUBLIC_DEPLOYER2_ADDRESS):", controlled2);
         console.log("   Controlled3 (PUBLIC_DEPLOYER2_ADDRESS - duplicate for testing):", controlled2);
+        console.log("   Controlled4 (4th account - all 1s):", controlled4);
         console.log("");
         console.log("[VERIFY] Verification Commands:");
         console.log("");
-        console.log("   # Check controlled accounts for PUBLIC_DEPLOYER_ADDRESS");
+        console.log("   # Check controlled accounts for PUBLIC_DEPLOYER_ADDRESS (default group)");
         console.log("   cast call", address(controlledAccounts));
         console.log("   getControlledAccounts(address)", controller1);
+        console.log("   --rpc-url $BASE_SEPOLIA_RPC_URL");
+        console.log("");
+        console.log("   # Check controlled accounts for PUBLIC_DEPLOYER_ADDRESS (main group)");
+        console.log("   cast call", address(controlledAccounts));
+        console.log("   getControlledAccounts(address,bytes32)", controller1, "0x", vm.toString(keccak256(bytes("main"))));
         console.log("   --rpc-url $BASE_SEPOLIA_RPC_URL");
         console.log("");
         console.log("   # Check controlled accounts for PUBLIC_DEPLOYER2_ADDRESS");
@@ -159,8 +174,14 @@ contract DeployControlledAccounts is Script {
         console.log("");
         console.log("[RESOLUTION] Credential Resolution Testing:");
         console.log("");
-        console.log("   # Test credential resolution for Controller1");
+        console.log("   # Test credential resolution for Controller1 (default group)");
         console.log("   # DNS identifier: {controller1_address}.3c (Ethereum coin type)");
+        console.log("   # Credential key: eth.ecs.controlled-accounts.accounts");
+        console.log("   # This would be used in: {controller1_address}.3c.addr.ecs.eth");
+        console.log("");
+        console.log("   # Test credential resolution for Controller1 (main group)");
+        console.log("   # DNS identifier: {controller1_address}.3c (Ethereum coin type)");
+        console.log("   # Credential key: eth.ecs.controlled-accounts.accounts:main");
         console.log("   # This would be used in: {controller1_address}.3c.addr.ecs.eth");
         console.log("");
         console.log("   # Test credential resolution for Controller2");
