@@ -246,6 +246,7 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
     /**
      * @dev Returns controlled accounts as a string for credential resolution
      * Supports chain-specific and group-specific resolution using credential key format: "key:chainId:groupId"
+     * Only returns accounts that have verified the controller relationship (either on the specified chain or default chain ID 0)
      * Examples: 
      *   "eth.ecs.controlled-accounts.accounts" (default group, current chain)
      *   "eth.ecs.controlled-accounts.accounts:1" (group 1, current chain)
@@ -253,7 +254,7 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
      *   "eth.ecs.controlled-accounts.accounts:8453:main" (main group, Base chain)
      * @param identifier The controller address (as bytes)
      * @param _credential The credential key to look up (can include chain ID and group ID after colons)
-     * @return The controlled accounts as a string (one address per line), empty string if key doesn't match
+     * @return The verified controlled accounts as a string (one address per line), empty string if key doesn't match
      */
     function credential(bytes calldata identifier, string calldata _credential) external view override returns (string memory) {
         // Parse the credential key to extract chain ID and group ID
@@ -268,7 +269,32 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
         require(identifier.length == 20, "Invalid identifier length");
         address controllerAddress = address(bytes20(identifier));
         
-        return _formatAccountsAsString(controlledAccounts[controllerAddress][chainId][groupId]);
+        // Get all accounts declared by the controller
+        address[] memory declaredAccounts = controlledAccounts[controllerAddress][chainId][groupId];
+        
+        // Filter to only include accounts that have verified the controller relationship
+        address[] memory verifiedAccounts = new address[](declaredAccounts.length);
+        uint256 verifiedCount = 0;
+        
+        for (uint256 i = 0; i < declaredAccounts.length; i++) {
+            address account = declaredAccounts[i];
+            
+            // Check if the account has verified the controller on the specified chain
+            // OR on the default chain ID (0) for cross-chain verification
+            if (accountController[account][chainId][controllerAddress] || 
+                accountController[account][0][controllerAddress]) {
+                verifiedAccounts[verifiedCount] = account;
+                verifiedCount++;
+            }
+        }
+        
+        // Create a properly sized array for the verified accounts
+        address[] memory resultAccounts = new address[](verifiedCount);
+        for (uint256 i = 0; i < verifiedCount; i++) {
+            resultAccounts[i] = verifiedAccounts[i];
+        }
+        
+        return _formatAccountsAsString(resultAccounts);
     }
 
     /* --- Admin Functions --- */

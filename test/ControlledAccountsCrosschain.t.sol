@@ -88,14 +88,29 @@ contract ControlledAccountsCrosschainTest is Test {
         vm.prank(CONTROLLED1);
         controlledAccounts.setController(BASE_SEPOLIA, CONTROLLER1);
         
+        vm.prank(CONTROLLED1);
+        controlledAccounts.setController(POLYGON_MUMBAI, CONTROLLER1);
+        
+        vm.prank(CONTROLLED1);
+        controlledAccounts.setController(ARBITRUM_SEPOLIA, CONTROLLER2);
+        
         vm.prank(CONTROLLED2);
         controlledAccounts.setController(SEPOLIA, CONTROLLER1);
+        
+        vm.prank(CONTROLLED2);
+        controlledAccounts.setController(BASE_SEPOLIA, CONTROLLER1);
         
         vm.prank(CONTROLLED3);
         controlledAccounts.setController(BASE_SEPOLIA, CONTROLLER1);
         
+        vm.prank(CONTROLLED3);
+        controlledAccounts.setController(POLYGON_MUMBAI, CONTROLLER1);
+        
         vm.prank(CONTROLLED4);
         controlledAccounts.setController(block.chainid, CONTROLLER1);
+        
+        vm.prank(CONTROLLED4);
+        controlledAccounts.setController(ARBITRUM_SEPOLIA, CONTROLLER2);
     }
     
     /* --- Cross-Chain Group Management Tests --- */

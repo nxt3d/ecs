@@ -67,15 +67,17 @@ contract ControlledAccountsCrosschainLayoutTest is Test {
         bytes memory identifier = abi.encodePacked(address(this));
         string memory result = controlledAccounts.credential(identifier, "eth.ecs.controlled-accounts.accounts:1");
         
-        // Should return all 5 accounts declared on L1
+        // Should return only accounts that have verified the controller relationship
         assertTrue(bytes(result).length > 0, "Should return non-empty result for L1 default group");
         
-        // Check that the result contains the expected addresses
+        // Check that the result contains the expected addresses (only those that verified controller)
         assertTrue(_containsAddress(result, address(this)), "Result should contain deployer address");
         assertTrue(_containsAddress(result, DUMMY1), "Result should contain dummy1 address");
         assertTrue(_containsAddress(result, DUMMY2), "Result should contain dummy2 address");
-        assertTrue(_containsAddress(result, DUMMY3), "Result should contain dummy3 address");
-        assertTrue(_containsAddress(result, DUMMY4), "Result should contain dummy4 address");
+        // dummy3 IS verified on default chain ID (0), so it should be returned for any chain ID query
+        assertTrue(_containsAddress(result, DUMMY3), "Result should contain dummy3 address (verified on default chain ID)");
+        // dummy4 is NOT verified at all, so it shouldn't be returned
+        assertFalse(_containsAddress(result, DUMMY4), "Result should NOT contain dummy4 address (not verified)");
     }
 
     function test_006____credentialResolution____BaseDefaultGroup() public {
@@ -88,6 +90,15 @@ contract ControlledAccountsCrosschainLayoutTest is Test {
         // Check that the result contains the expected addresses
         assertTrue(_containsAddress(result, BASE_ACCOUNT1), "Result should contain baseAccount1 address");
         assertTrue(_containsAddress(result, BASE_ACCOUNT2), "Result should contain baseAccount2 address");
+    }
+    
+    function test_006b____credentialResolution____DefaultChainIdIncludesCrossChainVerified() public {
+        bytes memory identifier = abi.encodePacked(address(this));
+        string memory result = controlledAccounts.credential(identifier, "eth.ecs.controlled-accounts.accounts:0");
+        
+        // When querying for chain ID 0, it should return empty because no accounts are declared for chain ID 0
+        // The default chain ID (0) verification is only used as a fallback for other chain ID queries
+        assertEq(result, "", "Should return empty result for chain ID 0 (no accounts declared for this chain)");
     }
 
     function test_007____credentialResolution____UnknownController() public {
