@@ -20,9 +20,9 @@ contract OffchainStarName is OffchainNameResolver {
     
     /// @dev Initialize with the verifier and target L2 address.
     /// @param verifier The gateway verifier contract.
-    /// @param targetL2Address The target L2 address for offchain resolution.
-    constructor(IGatewayVerifier verifier, address targetL2Address) 
-        OffchainNameResolver(verifier, targetL2Address) {
+    /// @param _targetL2Address The target L2 address for offchain resolution.
+    constructor(IGatewayVerifier verifier, address _targetL2Address) 
+        OffchainNameResolver(verifier, _targetL2Address) {
     }
     
     /* --- Credential Resolution --- */
@@ -53,14 +53,14 @@ contract OffchainStarName is OffchainNameResolver {
 
         GatewayRequest memory r = GatewayFetcher
             .newRequest(1)
-            .setTarget(_targetL2Address)
+            .setTarget(targetL2Address)
             .setSlot(3)
             .push(namehash)
             .follow()
             .read()
             .setOutput(0);
 
-        fetch(_verifier, r, this.credentialCallback.selector);
+        fetch(gatewayVerifier, r, this.credentialCallback.selector);
     }
 
     /**

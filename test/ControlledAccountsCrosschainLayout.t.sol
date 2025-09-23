@@ -15,9 +15,9 @@ contract ControlledAccountsCrosschainLayoutTest is Test {
     address constant BASE_ACCOUNT1 = 0x5555555555555555555555555555555555555555;
     address constant BASE_ACCOUNT2 = 0x6666666666666666666666666666666666666666;
     
-    uint256 constant L1_CHAIN_ID = 1;
-    uint256 constant BASE_CHAIN_ID = 8453;
-    uint256 constant DEFAULT_CHAIN_ID = 0;
+    uint256 constant L1_COIN_TYPE = 60; // Ethereum mainnet coin type
+    uint256 constant BASE_SEPOLIA_COIN_TYPE = 2147568180; // 0x80000000 | 84532
+    uint256 constant DEFAULT_COIN_TYPE = 0;
 
     function setUp() public {
         controlledAccounts = new ControlledAccountsCrosschainLayout();
@@ -28,7 +28,7 @@ contract ControlledAccountsCrosschainLayoutTest is Test {
     }
 
     function test_002____constructorSetup____L1AccountsDeclared() public {
-        address[] memory l1Accounts = controlledAccounts.getControlledAccounts(address(this), L1_CHAIN_ID, bytes32(0));
+        address[] memory l1Accounts = controlledAccounts.getControlledAccounts(address(this), L1_COIN_TYPE, bytes32(0));
         
         assertEq(l1Accounts.length, 5, "Should have 5 accounts declared on L1");
         assertEq(l1Accounts[0], address(this), "First account should be deployer");
@@ -38,34 +38,34 @@ contract ControlledAccountsCrosschainLayoutTest is Test {
         assertEq(l1Accounts[4], DUMMY4, "Fifth account should be dummy4");
     }
 
-    function test_003____constructorSetup____BaseAccountsDeclared() public {
-        address[] memory baseAccounts = controlledAccounts.getControlledAccounts(address(this), BASE_CHAIN_ID, bytes32(0));
+    function test_003____constructorSetup____BaseSepoliaAccountsDeclared() public {
+        address[] memory baseSepoliaAccounts = controlledAccounts.getControlledAccounts(address(this), BASE_SEPOLIA_COIN_TYPE, bytes32(0));
         
-        assertEq(baseAccounts.length, 2, "Should have 2 accounts declared on Base");
-        assertEq(baseAccounts[0], BASE_ACCOUNT1, "First Base account should be baseAccount1");
-        assertEq(baseAccounts[1], BASE_ACCOUNT2, "Second Base account should be baseAccount2");
+        assertEq(baseSepoliaAccounts.length, 2, "Should have 2 accounts declared on Base Sepolia");
+        assertEq(baseSepoliaAccounts[0], BASE_ACCOUNT1, "First Base Sepolia account should be baseAccount1");
+        assertEq(baseSepoliaAccounts[1], BASE_ACCOUNT2, "Second Base Sepolia account should be baseAccount2");
     }
 
     function test_004____constructorSetup____ControllerRelationshipsSet() public {
         // Deployer should have itself as controller on L1 (self-verification)
-        assertTrue(controlledAccounts.isController(address(this), L1_CHAIN_ID, address(this)), "deployer should have itself as controller on L1");
+        assertTrue(controlledAccounts.isController(address(this), L1_COIN_TYPE, address(this)), "deployer should have itself as controller on L1");
         
         // dummy1 and dummy2 should have deployer as controller on L1
-        assertTrue(controlledAccounts.isController(DUMMY1, L1_CHAIN_ID, address(this)), "dummy1 should have deployer as controller on L1");
-        assertTrue(controlledAccounts.isController(DUMMY2, L1_CHAIN_ID, address(this)), "dummy2 should have deployer as controller on L1");
+        assertTrue(controlledAccounts.isController(DUMMY1, L1_COIN_TYPE, address(this)), "dummy1 should have deployer as controller on L1");
+        assertTrue(controlledAccounts.isController(DUMMY2, L1_COIN_TYPE, address(this)), "dummy2 should have deployer as controller on L1");
         
         // dummy3 and dummy4 should NOT have deployer as controller on L1
-        assertFalse(controlledAccounts.isController(DUMMY3, L1_CHAIN_ID, address(this)), "dummy3 should NOT have deployer as controller on L1");
-        assertFalse(controlledAccounts.isController(DUMMY4, L1_CHAIN_ID, address(this)), "dummy4 should NOT have deployer as controller on L1");
+        assertFalse(controlledAccounts.isController(DUMMY3, L1_COIN_TYPE, address(this)), "dummy3 should NOT have deployer as controller on L1");
+        assertFalse(controlledAccounts.isController(DUMMY4, L1_COIN_TYPE, address(this)), "dummy4 should NOT have deployer as controller on L1");
         
-        // Base accounts should have deployer as controller for default chain ID 0
-        assertTrue(controlledAccounts.isController(BASE_ACCOUNT1, DEFAULT_CHAIN_ID, address(this)), "baseAccount1 should have deployer as controller for chain ID 0");
-        assertTrue(controlledAccounts.isController(BASE_ACCOUNT2, DEFAULT_CHAIN_ID, address(this)), "baseAccount2 should have deployer as controller for chain ID 0");
+        // Base Sepolia accounts should have deployer as controller for default chain ID 0
+        assertTrue(controlledAccounts.isController(BASE_ACCOUNT1, DEFAULT_COIN_TYPE, address(this)), "baseAccount1 should have deployer as controller for chain ID 0");
+        assertTrue(controlledAccounts.isController(BASE_ACCOUNT2, DEFAULT_COIN_TYPE, address(this)), "baseAccount2 should have deployer as controller for chain ID 0");
     }
 
     function test_005____credentialResolution____L1DefaultGroup() public {
         bytes memory identifier = abi.encodePacked(address(this));
-        string memory result = controlledAccounts.credential(identifier, "eth.ecs.controlled-accounts.accounts:1");
+        string memory result = controlledAccounts.credential(identifier, "eth.ecs.controlled-accounts.accounts:60");
         
         // Should return only accounts that have verified the controller relationship
         assertTrue(bytes(result).length > 0, "Should return non-empty result for L1 default group");
@@ -80,12 +80,12 @@ contract ControlledAccountsCrosschainLayoutTest is Test {
         assertFalse(_containsAddress(result, DUMMY4), "Result should NOT contain dummy4 address (not verified)");
     }
 
-    function test_006____credentialResolution____BaseDefaultGroup() public {
+    function test_006____credentialResolution____BaseSepoliaDefaultGroup() public {
         bytes memory identifier = abi.encodePacked(address(this));
-        string memory result = controlledAccounts.credential(identifier, "eth.ecs.controlled-accounts.accounts:8453");
+        string memory result = controlledAccounts.credential(identifier, "eth.ecs.controlled-accounts.accounts:2147568180");
         
-        // Should return 2 accounts declared on Base
-        assertTrue(bytes(result).length > 0, "Should return non-empty result for Base default group");
+        // Should return 2 accounts declared on Base Sepolia
+        assertTrue(bytes(result).length > 0, "Should return non-empty result for Base Sepolia default group");
         
         // Check that the result contains the expected addresses
         assertTrue(_containsAddress(result, BASE_ACCOUNT1), "Result should contain baseAccount1 address");
@@ -104,7 +104,7 @@ contract ControlledAccountsCrosschainLayoutTest is Test {
     function test_007____credentialResolution____UnknownController() public {
         address unknownController = 0x9999999999999999999999999999999999999999;
         bytes memory identifier = abi.encodePacked(unknownController);
-        string memory result = controlledAccounts.credential(identifier, "eth.ecs.controlled-accounts.accounts:1");
+        string memory result = controlledAccounts.credential(identifier, "eth.ecs.controlled-accounts.accounts:60");
         
         assertEq(result, "", "Should return empty string for unknown controller");
     }

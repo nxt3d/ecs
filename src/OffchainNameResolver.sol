@@ -37,22 +37,45 @@ abstract contract OffchainNameResolver is GatewayFetchTarget, ICredentialResolve
     bytes32 public constant ADMIN_ROLE = keccak256(bytes("ADMIN_ROLE"));
 
     /* --- Storage --- */
-
-    IGatewayVerifier immutable _verifier;
-    address immutable _targetL2Address;
+    
+    // Configurable verifier and target address
+    IGatewayVerifier public gatewayVerifier;
+    address public targetL2Address;
 
     /* --- Constructor --- */
     
     /// @dev Initialize with the verifier and target L2 address.
     /// @param verifier The gateway verifier contract.
-    /// @param targetL2Address The target L2 address for offchain resolution.
-    /// @notice This contract is designed to be used with a specific verifier and target address.
-    constructor(IGatewayVerifier verifier, address targetL2Address) {
-        _verifier = verifier;
-        _targetL2Address = targetL2Address;
-
+    /// @param _targetL2Address The target L2 address for offchain resolution.
+    /// @notice This contract provides base functionality for offchain name-based credential resolution.
+    constructor(IGatewayVerifier verifier, address _targetL2Address) {
+        gatewayVerifier = verifier;
+        targetL2Address = _targetL2Address;
+        
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(ADMIN_ROLE, msg.sender);
+    }
+    
+    /* --- Admin Functions --- */
+    
+    /**
+     * @dev Update the gateway verifier
+     * @param newVerifier The new gateway verifier contract
+     * @notice Only accounts with ADMIN_ROLE can update the verifier
+     */
+    function updateVerifier(IGatewayVerifier newVerifier) external onlyRole(ADMIN_ROLE) {
+        require(address(newVerifier) != address(0), "Invalid verifier address");
+        gatewayVerifier = newVerifier;
+    }
+    
+    /**
+     * @dev Update the target L2 address
+     * @param newTargetL2Address The new target L2 address for offchain resolution
+     * @notice Only accounts with ADMIN_ROLE can update the target address
+     */
+    function updateTargetL2Address(address newTargetL2Address) external onlyRole(ADMIN_ROLE) {
+        require(newTargetL2Address != address(0), "Invalid target address");
+        targetL2Address = newTargetL2Address;
     }
     
     /* --- Resolution --- */

@@ -7,11 +7,11 @@ import "../../utils/ECSUtils.sol";
 
 /**
  * @title ControlledAccountsCrosschain
- * @dev A credential resolver for managing controlled accounts across multiple chains.
- * Controllers can declare multiple accounts they control on different chains, and controlled accounts 
- * can verify their controller relationship across chains.
+ * @dev A credential resolver for managing controlled accounts across multiple coin types.
+ * Controllers can declare multiple accounts they control on different coin types, and controlled accounts 
+ * can verify their controller relationship across coin types.
  * Credential key: "eth.ecs.controlled-accounts.accounts"
- * Supports chain-specific groups and cross-chain controller verification.
+ * Supports coin-type-specific groups and cross-coin-type controller verification.
  */
 contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
     using ECSUtils for bytes;
@@ -22,10 +22,10 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
     
     /* --- Events --- */
 
-    event ControlledAccountsDeclaredInGroup(address indexed controller, uint256 indexed chainId, bytes32 indexed groupId, address[] accounts);
-    event ControlledAccountRemovedFromGroup(address indexed controller, uint256 indexed chainId, bytes32 indexed groupId, address account);
-    event ControllerSet(address indexed controlledAccount, uint256 indexed chainId, address indexed controller);
-    event ControllerRemoved(address indexed controlledAccount, uint256 indexed chainId, address previousController);
+    event ControlledAccountsDeclaredInGroup(address indexed controller, uint256 indexed coinType, bytes32 indexed groupId, address[] accounts);
+    event ControlledAccountRemovedFromGroup(address indexed controller, uint256 indexed coinType, bytes32 indexed groupId, address account);
+    event ControllerSet(address indexed controlledAccount, uint256 indexed coinType, address indexed controller);
+    event ControllerRemoved(address indexed controlledAccount, uint256 indexed coinType, address previousController);
     event TextRecordKeyUpdated(string oldKey, string newKey);
 
 
@@ -34,12 +34,12 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
     // The configurable text record key
     string public textRecordKey = "eth.ecs.controlled-accounts.accounts";
     
-    // Controller -> chainId -> groupId -> array of controlled accounts (what the controller declares)
+    // Controller -> coinType -> groupId -> array of controlled accounts (what the controller declares)
     // bytes32(0) is the default group
-    mapping(address controller => mapping(uint256 chainId => mapping(bytes32 groupId => address[] accounts))) public controlledAccounts;
+    mapping(address controller => mapping(uint256 coinType => mapping(bytes32 groupId => address[] accounts))) public controlledAccounts;
     
-    // Controlled account -> chainId -> controller -> isController (what the controlled account declares)
-    mapping(address controlled => mapping(uint256 chainId => mapping(address controller => bool isController))) public accountController;
+    // Controlled account -> coinType -> controller -> isController (what the controlled account declares)
+    mapping(address controlled => mapping(uint256 coinType => mapping(address controller => bool isController))) public accountController;
 
 
 
@@ -50,10 +50,62 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
         _grantRole(ADMIN_ROLE, msg.sender);
     }
 
+    /* --- Chain ID to Coin Type Conversion --- */
+
+    /**
+     * @dev Convert a chain ID to its corresponding ENS coin type
+     * @param chainId The EVM chain ID to convert
+     * @return coinType The corresponding ENS coin type
+     */
+    function chainIdToCoinType(uint256 chainId) public pure returns (uint256 coinType) {
+        // ENS EVM coin type formula: 0x80000000 | chainId
+        // This ensures no collision with SLIP44 coin types
+        require(chainId < 0x80000000, "Chain ID too large for EVM coin type conversion");
+        return 0x80000000 | chainId;
+    }
+
+    /**
+     * @dev Convert a coin type back to its corresponding chain ID
+     * @param coinType The ENS coin type to convert
+     * @return chainId The corresponding EVM chain ID
+     */
+    function coinTypeToChainId(uint256 coinType) public pure returns (uint256 chainId) {
+        // Check if it's an EVM coin type (has the 0x80000000 bit set)
+        require((coinType & 0x80000000) != 0, "Not an EVM coin type");
+        return coinType & 0x7FFFFFFF; // Remove the MSB
+    }
+
+    /**
+     * @dev Validate if a coin type is valid for msg.sender (current chain only)
+     * @param coinType The coin type to validate
+     * @return isValid True if the coin type matches current chain
+     */
+    function isValidCoinType(uint256 coinType) public view returns (bool isValid) {
+        // Only allow current chain's coin type for msg.sender
+        uint256 currentChainCoinType = chainIdToCoinType(block.chainid);
+        return coinType == currentChainCoinType;
+    }
+    
+    /**
+     * @dev Validate if a coin type is valid for signed messages (current chain or coin type 0)
+     * @param coinType The coin type to validate
+     * @return isValid True if the coin type is current chain or coin type 0
+     */
+    function isValidCoinTypeForSignature(uint256 coinType) public view returns (bool isValid) {
+        // Allow current chain's coin type
+        uint256 currentChainCoinType = chainIdToCoinType(block.chainid);
+        if (coinType == currentChainCoinType) {
+            return true;
+        }
+        
+        // Allow coin type 0 for cross-coin-type relationships
+        return coinType == 0;
+    }
+
     /* --- Control Functions --- */
 
     /**
-     * @dev Declare a single account as controlled by the caller (default group, current chain)
+     * @dev Declare a single account as controlled by the caller (default group, current coin type)
      * @param account The account address to declare as controlled
      */
     function declareControlledAccount(address account) external {
@@ -61,7 +113,7 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
     }
 
     /**
-     * @dev Declare multiple accounts as controlled by the caller (default group, current chain)
+     * @dev Declare multiple accounts as controlled by the caller (default group, current coin type)
      * @param accounts Array of account addresses to declare as controlled
      */
     function declareControlledAccounts(address[] memory accounts) external {
@@ -69,7 +121,7 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
     }
 
     /**
-     * @dev Remove a controlled account from default group (current chain)
+     * @dev Remove a controlled account from default group (current coin type)
      * @param account The account address to remove from controlled accounts
      */
     function removeControlledAccount(address account) external {
@@ -77,7 +129,7 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
     }
 
     /**
-     * @dev Set the controller for the calling account (verification from controlled account side, current chain)
+     * @dev Set the controller for the calling account (verification from controlled account side, current coin type)
      * @param controller The controller address to set (use address(0) to remove)
      */
     function setController(address controller) external {
@@ -87,43 +139,46 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
     /* --- Group Functions --- */
 
     /**
-     * @dev Declare a single account as controlled by the caller in a specific group on a specific chain
-     * @param chainId The chain ID where the controlled account exists
+     * @dev Declare a single account as controlled by the caller in a specific group on a specific coin type
+     * @param coinType The coin type where the controlled account exists
      * @param groupId The group identifier (use bytes32(0) for default group)
      * @param account The account address to declare as controlled
      */
-    function declareControlledAccount(uint256 chainId, bytes32 groupId, address account) public {
-        controlledAccounts[msg.sender][chainId][groupId].push(account);
+    function declareControlledAccount(uint256 coinType, bytes32 groupId, address account) public {
+        require(isValidCoinType(coinType), "Invalid coin type for current chain");
+        controlledAccounts[msg.sender][coinType][groupId].push(account);
         
         // Emit event with single account array for consistency
         address[] memory accounts = new address[](1);
         accounts[0] = account;
         
-        emit ControlledAccountsDeclaredInGroup(msg.sender, chainId, groupId, accounts);
+        emit ControlledAccountsDeclaredInGroup(msg.sender, coinType, groupId, accounts);
     }
 
     /**
-     * @dev Declare multiple accounts as controlled by the caller in a specific group on a specific chain
-     * @param chainId The chain ID where the controlled accounts exist
+     * @dev Declare multiple accounts as controlled by the caller in a specific group on a specific coin type
+     * @param coinType The coin type where the controlled accounts exist
      * @param groupId The group identifier (use bytes32(0) for default group)
      * @param accounts Array of account addresses to declare as controlled
      */
-    function declareControlledAccounts(uint256 chainId, bytes32 groupId, address[] memory accounts) public {
+    function declareControlledAccounts(uint256 coinType, bytes32 groupId, address[] memory accounts) public {
+        require(isValidCoinType(coinType), "Invalid coin type for current chain");
         for (uint256 i = 0; i < accounts.length; i++) {
-            controlledAccounts[msg.sender][chainId][groupId].push(accounts[i]);
+            controlledAccounts[msg.sender][coinType][groupId].push(accounts[i]);
         }
         
-        emit ControlledAccountsDeclaredInGroup(msg.sender, chainId, groupId, accounts);
+        emit ControlledAccountsDeclaredInGroup(msg.sender, coinType, groupId, accounts);
     }
 
     /**
-     * @dev Remove a controlled account from a specific group on a specific chain
-     * @param chainId The chain ID where the controlled account exists
+     * @dev Remove a controlled account from a specific group on a specific coin type
+     * @param coinType The coin type where the controlled account exists
      * @param groupId The group identifier (use bytes32(0) for default group)
      * @param account The account address to remove from controlled accounts
      */
-    function removeControlledAccount(uint256 chainId, bytes32 groupId, address account) public {
-        address[] storage accounts = controlledAccounts[msg.sender][chainId][groupId];
+    function removeControlledAccount(uint256 coinType, bytes32 groupId, address account) public {
+        require(isValidCoinType(coinType), "Invalid coin type for current chain");
+        address[] storage accounts = controlledAccounts[msg.sender][coinType][groupId];
         
         // Find and remove the account (simple linear search)
         for (uint256 i = 0; i < accounts.length; i++) {
@@ -132,7 +187,7 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
                 accounts[i] = accounts[accounts.length - 1];
                 accounts.pop();
                 
-                emit ControlledAccountRemovedFromGroup(msg.sender, chainId, groupId, account);
+                emit ControlledAccountRemovedFromGroup(msg.sender, coinType, groupId, account);
                 return;
             }
         }
@@ -140,43 +195,50 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
     }
 
     /**
-     * @dev Set the controller for the calling account on a specific chain (verification from controlled account side)
-     * @param chainId The chain ID where the controller relationship exists
+     * @dev Set the controller for the calling account on a specific coin type (verification from controlled account side)
+     * @param coinType The coin type where the controller relationship exists
      * @param controller The controller address to set
      */
-    function setController(uint256 chainId, address controller) public {
+    function setController(uint256 coinType, address controller) public {
+        require(isValidCoinType(coinType), "Invalid coin type for current chain");
         require(controller != address(0), "Controller cannot be zero address");
         
         // Set this specific controller
-        accountController[msg.sender][chainId][controller] = true;
-        emit ControllerSet(msg.sender, chainId, controller);
+        accountController[msg.sender][coinType][controller] = true;
+        emit ControllerSet(msg.sender, coinType, controller);
     }
 
     /**
-     * @dev Remove a specific controller for the calling account on a specific chain
-     * @param chainId The chain ID where the controller relationship exists
+     * @dev Remove a specific controller for the calling account on a specific coin type
+     * @param coinType The coin type where the controller relationship exists
      * @param controller The controller address to remove
      */
-    function removeController(uint256 chainId, address controller) public {
+    function removeController(uint256 coinType, address controller) public {
+        require(isValidCoinType(coinType), "Invalid coin type for current chain");
         require(controller != address(0), "Controller cannot be zero address");
         
         // Remove this specific controller
-        accountController[msg.sender][chainId][controller] = false;
-        emit ControllerRemoved(msg.sender, chainId, controller);
+        accountController[msg.sender][coinType][controller] = false;
+        emit ControllerRemoved(msg.sender, coinType, controller);
     }
 
     /**
      * @dev Set the controller for an account using a signature (for smart accounts that can't directly call setController)
-     * The signature must be from the controlled account's private key, and the relationship is stored with chain ID 0
+     * The signature must be from the controlled account's private key
      * @param controlledAccount The account that is being controlled
+     * @param coinType The coin type for the controller relationship (must be current chain or 0)
      * @param controller The controller address to set
      * @param signature The signature from the controlled account's private key
      */
-    function setControllerWithSignature(address controlledAccount, address controller, bytes calldata signature) public {
+    function setControllerWithSignature(address controlledAccount, uint256 coinType, address controller, bytes calldata signature) public {
+        require(isValidCoinTypeForSignature(coinType), "Invalid coin type for signature-based controller setting");
+        require(controller != address(0), "Controller cannot be zero address");
+        
         // Create the message hash that should be signed
         bytes32 messageHash = keccak256(abi.encodePacked(
             "ControlledAccounts: setControllerWithSignature",
             controlledAccount,
+            coinType,
             controller,
             address(this)
         ));
@@ -193,15 +255,15 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
         // Verify that the signer is the controlled account
         require(signer == controlledAccount, "Invalid signature: signer must be the controlled account");
         
-        // Set the controller relationship with chain ID 0 (default/cross-chain indicator)
-        accountController[controlledAccount][0][controller] = true;
-        emit ControllerSet(controlledAccount, 0, controller);
+        // Set the controller relationship
+        accountController[controlledAccount][coinType][controller] = true;
+        emit ControllerSet(controlledAccount, coinType, controller);
     }
 
     /* --- View Functions --- */
 
     /**
-     * @dev Get all controlled accounts for a controller (default group, current chain)
+     * @dev Get all controlled accounts for a controller (default group, current coin type)
      * @param controller The controller address
      * @return Array of controlled account addresses
      */
@@ -210,7 +272,7 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
     }
 
     /**
-     * @dev Check if a specific controller is set for a controlled account (current chain)
+     * @dev Check if a specific controller is set for a controlled account (current coin type)
      * @param controlledAccount The controlled account address
      * @param controller The controller address to check
      * @return True if the controller is set for this account
@@ -220,45 +282,45 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
     }
 
     /**
-     * @dev Get all controlled accounts for a controller in a specific group on a specific chain
+     * @dev Get all controlled accounts for a controller in a specific group on a specific coin type
      * @param controller The controller address
-     * @param chainId The chain ID where the controlled accounts exist
+     * @param coinType The coin type where the controlled accounts exist
      * @param groupId The group identifier (use bytes32(0) for default group)
      * @return Array of controlled account addresses
      */
-    function getControlledAccounts(address controller, uint256 chainId, bytes32 groupId) public view returns (address[] memory) {
-        return controlledAccounts[controller][chainId][groupId];
+    function getControlledAccounts(address controller, uint256 coinType, bytes32 groupId) public view returns (address[] memory) {
+        return controlledAccounts[controller][coinType][groupId];
     }
 
     /**
-     * @dev Check if a specific controller is set for a controlled account on a specific chain
+     * @dev Check if a specific controller is set for a controlled account on a specific coin type
      * @param controlledAccount The controlled account address
-     * @param chainId The chain ID where the controller relationship exists
+     * @param coinType The coin type where the controller relationship exists
      * @param controller The controller address to check
-     * @return True if the controller is set for this account on this chain
+     * @return True if the controller is set for this account on this coin type
      */
-    function isController(address controlledAccount, uint256 chainId, address controller) public view returns (bool) {
-        return accountController[controlledAccount][chainId][controller];
+    function isController(address controlledAccount, uint256 coinType, address controller) public view returns (bool) {
+        return accountController[controlledAccount][coinType][controller];
     }
 
 
 
     /**
      * @dev Returns controlled accounts as a string for credential resolution
-     * Supports chain-specific and group-specific resolution using credential key format: "key:chainId:groupId"
-     * Only returns accounts that have verified the controller relationship (either on the specified chain or default chain ID 0)
+     * Supports coin-type-specific and group-specific resolution using credential key format: "key:coinType:groupId"
+     * Only returns accounts that have verified the controller relationship (either on the specified coin type or default coin type 0)
      * Examples: 
-     *   "eth.ecs.controlled-accounts.accounts" (default group, current chain)
-     *   "eth.ecs.controlled-accounts.accounts:1" (group 1, current chain)
-     *   "eth.ecs.controlled-accounts.accounts:8453" (default group, Base chain)
-     *   "eth.ecs.controlled-accounts.accounts:8453:main" (main group, Base chain)
+     *   "eth.ecs.controlled-accounts.accounts" (default group, current coin type)
+     *   "eth.ecs.controlled-accounts.accounts:1" (group 1, current coin type)
+     *   "eth.ecs.controlled-accounts.accounts:60" (default group, Ethereum coin type)
+     *   "eth.ecs.controlled-accounts.accounts:60:main" (main group, Ethereum coin type)
      * @param identifier The controller address (as bytes)
-     * @param _credential The credential key to look up (can include chain ID and group ID after colons)
+     * @param _credential The credential key to look up (can include coin type and group ID after colons)
      * @return The verified controlled accounts as a string (one address per line), empty string if key doesn't match
      */
     function credential(bytes calldata identifier, string calldata _credential) external view override returns (string memory) {
-        // Parse the credential key to extract chain ID and group ID
-        (string memory baseKey, uint256 chainId, bytes32 groupId) = _parseCredentialKey(_credential);
+        // Parse the credential key to extract coin type and group ID
+        (string memory baseKey, uint256 coinType, bytes32 groupId) = _parseCredentialKey(_credential);
 
         // Check if the base key matches the text record key
         if (keccak256(bytes(baseKey)) != keccak256(bytes(textRecordKey))) {
@@ -270,7 +332,7 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
         address controllerAddress = address(bytes20(identifier));
         
         // Get all accounts declared by the controller
-        address[] memory declaredAccounts = controlledAccounts[controllerAddress][chainId][groupId];
+        address[] memory declaredAccounts = controlledAccounts[controllerAddress][coinType][groupId];
         
         // Filter to only include accounts that have verified the controller relationship
         address[] memory verifiedAccounts = new address[](declaredAccounts.length);
@@ -279,9 +341,9 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
         for (uint256 i = 0; i < declaredAccounts.length; i++) {
             address account = declaredAccounts[i];
             
-            // Check if the account has verified the controller on the specified chain
-            // OR on the default chain ID (0) for cross-chain verification
-            if (accountController[account][chainId][controllerAddress] || 
+            // Check if the account has verified the controller on the specified coin type
+            // OR on the default coin type (0) for cross-coin-type verification
+            if (accountController[account][coinType][controllerAddress] || 
                 accountController[account][0][controllerAddress]) {
                 verifiedAccounts[verifiedCount] = account;
                 verifiedCount++;
@@ -313,14 +375,14 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
     /* --- Internal Helper Functions --- */
 
     /**
-     * @dev Parse credential key to extract base key, chain ID, and group ID
-     * Format: "key:chainId:groupId" or "key:chainId" or "key:groupId" or just "key"
+     * @dev Parse credential key to extract base key, coin type, and group ID
+     * Format: "key:coinType:groupId" or "key:coinType" or "key:groupId" or just "key"
      * @param _credential The credential key to parse
-     * @return baseKey The base credential key without chain ID and group ID
-     * @return chainId The chain ID (block.chainid for current chain if not specified)
+     * @return baseKey The base credential key without coin type and group ID
+     * @return coinType The coin type (block.chainid for current coin type if not specified)
      * @return groupId The group ID (bytes32(0) for default group)
      */
-    function _parseCredentialKey(string calldata _credential) internal view returns (string memory baseKey, uint256 chainId, bytes32 groupId) {
+    function _parseCredentialKey(string calldata _credential) internal view returns (string memory baseKey, uint256 coinType, bytes32 groupId) {
         bytes memory credentialBytes = bytes(_credential);
         
         // Find first colon separator
@@ -333,7 +395,7 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
         }
         
         if (firstColon == 0) {
-            // No colon found, use entire string as base key, current chain, default group
+            // No colon found, use entire string as base key, current coin type, default group
             return (_credential, block.chainid, bytes32(0));
         }
         
@@ -354,7 +416,7 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
         }
         
         if (secondColon == 0) {
-            // Only one colon found - could be chain ID or group ID
+            // Only one colon found - could be coin type or group ID
             uint256 remainingLength = credentialBytes.length - firstColon - 1;
             if (remainingLength > 0) {
                 bytes memory remainingBytes = new bytes(remainingLength);
@@ -363,30 +425,30 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
                 }
                 string memory remaining = string(remainingBytes);
                 
-                // Try to parse as chain ID (numeric)
+                // Try to parse as coin type (numeric)
                 if (_isNumeric(remaining)) {
-                    chainId = _parseUint256(remaining);
+                    coinType = _parseUint256(remaining);
                     groupId = bytes32(0); // default group
                 } else {
                     // Treat as group ID
-                    chainId = block.chainid; // current chain
+                    coinType = block.chainid; // current coin type
                     groupId = keccak256(remainingBytes);
                 }
             } else {
-                chainId = block.chainid;
+                coinType = block.chainid;
                 groupId = bytes32(0);
             }
         } else {
-            // Two colons found - first is chain ID, second is group ID
-            uint256 chainIdLength = secondColon - firstColon - 1;
-            if (chainIdLength > 0) {
-                bytes memory chainIdBytes = new bytes(chainIdLength);
-                for (uint256 j = 0; j < chainIdLength; j++) {
-                    chainIdBytes[j] = credentialBytes[firstColon + 1 + j];
+            // Two colons found - first is coin type, second is group ID
+            uint256 coinTypeLength = secondColon - firstColon - 1;
+            if (coinTypeLength > 0) {
+                bytes memory coinTypeBytes = new bytes(coinTypeLength);
+                for (uint256 j = 0; j < coinTypeLength; j++) {
+                    coinTypeBytes[j] = credentialBytes[firstColon + 1 + j];
                 }
-                chainId = _parseUint256(string(chainIdBytes));
+                coinType = _parseUint256(string(coinTypeBytes));
             } else {
-                chainId = block.chainid;
+                coinType = block.chainid;
             }
             
             uint256 groupIdLength = credentialBytes.length - secondColon - 1;
@@ -401,7 +463,7 @@ contract ControlledAccountsCrosschain is ICredentialResolver, AccessControl {
             }
         }
         
-        return (baseKey, chainId, groupId);
+        return (baseKey, coinType, groupId);
     }
 
     /**
