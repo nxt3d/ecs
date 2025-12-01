@@ -280,6 +280,19 @@ contract ECSRegistry is ERC165, AccessControl {
     }
 
     /**
+     * @dev Returns the label string associated with a resolver address
+     * @param resolver_ The resolver address to look up
+     * @return string The human-readable label
+     */
+    function getLabelByResolver(address resolver_) external view returns (string memory) {
+        bytes32 labelhash = resolverToLabelhash[resolver_];
+        if (labelhash == bytes32(0)) {
+            return "";
+        }
+        return records[labelhash].label;
+    }
+
+    /**
      * @dev Extends the expiration time
      * @param labelhash The labelhash to extend lock for
      * @param newExpiration The new expiration timestamp (must be later than current)

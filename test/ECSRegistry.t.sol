@@ -359,6 +359,13 @@ contract ECSRegistryTest is Test {
         );
         registry.setRecord(labelhash2, newOwner, resolver, secret);
     }
+    function test_016____getLabelByResolver________________ReturnsCorrectLabel() public {
+        uint256 expires = block.timestamp + DURATION;
+        vm.prank(registrar);
+        registry.setLabelhashRecord(LABEL, user1, resolver, expires);
+        
+        assertEq(registry.getLabelByResolver(resolver), LABEL);
+        assertEq(registry.getLabelByResolver(address(0xdeadbeef)), "");
+    }
 }
 
-import "@openzeppelin/contracts/utils/Strings.sol";

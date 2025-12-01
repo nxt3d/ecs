@@ -43,7 +43,7 @@ Hooks allow an ENS name to "redirect" a query to a known resolver.
     hook("text(bytes32,string)", <ECS_RESOLVER_ADDRESS>)
     ```
 2.  **Client** reads this record and extracts the `<ECS_RESOLVER_ADDRESS>`.
-3.  **Client** looks up the address in the ECS Registry to find its registered label (e.g., `my-service`).
+3.  **Client** calls `getLabelByResolver(<ECS_RESOLVER_ADDRESS>)` on the ECS Registry to find its registered label (e.g., `my-service`).
 4.  **Client** constructs the service name `my-service.ecs.eth`.
 5.  **Client** resolves the original query (e.g., `text(node, "proof-of-person")`) against `my-service.ecs.eth`.
 6.  **Resolver** returns the verified credential data.
