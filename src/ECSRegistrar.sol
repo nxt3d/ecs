@@ -26,6 +26,14 @@ contract ECSRegistrar is
     uint64 private constant MAX_EXPIRY = type(uint64).max;
     ECSRegistry public immutable ecsRegistry;
     
+    // Commitments
+    mapping(bytes32 => uint256) public commitments;
+    uint256 public constant MIN_COMMITMENT_AGE = 60;
+    
+    error CommitmentNotFound(bytes32 commitment);
+    error CommitmentTooNew(bytes32 commitment);
+    error CommitmentAlreadyExists(bytes32 commitment);
+    
     // The pricing and byte length requirements for subdomains
     uint64 public minRegistrationDuration;
     uint64 public maxRegistrationDuration;
@@ -206,27 +214,41 @@ contract ECSRegistrar is
         return validLength(label) && ecsRegistry.isExpired(labelhash);
     }
 
+    function commit(bytes32 commitment) external {
+        if (commitments[commitment] != 0) revert CommitmentAlreadyExists(commitment);
+        commitments[commitment] = block.timestamp;
+    }
+
+    function createCommitment(string memory label, address owner, address resolver, uint256 duration, bytes32 secret) external pure returns (bytes32) {
+        return keccak256(abi.encodePacked(label, owner, resolver, duration, secret));
+    }
+
+    function _consumeCommitment(string memory label, address owner, address resolver, uint256 duration, bytes32 secret) internal {
+        bytes32 commitment = keccak256(abi.encodePacked(label, owner, resolver, duration, secret));
+        uint256 timestamp = commitments[commitment];
+        
+        if (timestamp == 0) revert CommitmentNotFound(commitment);
+        if (block.timestamp < timestamp + MIN_COMMITMENT_AGE) revert CommitmentTooNew(commitment);
+        
+        delete commitments[commitment];
+    }
+
     /**
      * @notice Register a subdomain under the parent domain
      * @param label The label to register
      * @param owner The address that will own the name
+     * @param resolver The resolver address for the name
      * @param duration The duration in seconds of the registration
-     * @param keys Array of text record keys to set
-     * @param values Array of text record values to set
-     * @param coinTypes Array of coin types for address records
-     * @param addresses Array of address records
-     * @param contentHash Content hash to set
+     * @param secret The secret used in the commitment
      */
     function register(
         string calldata label,
         address owner,
+        address resolver,
         uint256 duration,
-        string[] memory keys,
-        string[] memory values,
-        uint256[] memory coinTypes,
-        bytes[] memory addresses,
-        bytes memory contentHash
+        bytes32 secret
     ) public payable {
+        _consumeCommitment(label, owner, resolver, duration, secret);
 
         // Check duration is within limits
         if (duration < minRegistrationDuration || duration > maxRegistrationDuration){
@@ -252,17 +274,14 @@ contract ECSRegistrar is
         ecsRegistry.setLabelhashRecord(
             label,
             owner,
-            expires,
-            keys,
-            values,
-            coinTypes,
-            addresses,
-            contentHash
+            resolver,
+            expires
         );
 
         // Refund excess ETH if any
         if (msg.value > price) {
-            payable(msg.sender).transfer(msg.value - price);
+            (bool success, ) = payable(msg.sender).call{value: msg.value - price}("");
+            require(success, "Refund failed");
         }
 
         emit NameRegistered(
@@ -296,12 +315,14 @@ contract ECSRegistrar is
         }
 
         // Extend the expiration in the registry
-        uint256 newExpiration = block.timestamp + duration;
+        uint256 currentExpiration = ecsRegistry.getExpiration(labelhash);
+        uint256 newExpiration = currentExpiration + duration;
         ecsRegistry.extendExpiration(labelhash, newExpiration);
 
         // Refund excess ETH if any
         if (msg.value > price) {
-            payable(msg.sender).transfer(msg.value - price);
+            (bool success, ) = payable(msg.sender).call{value: msg.value - price}("");
+            require(success, "Refund failed");
         }
 
         emit NameRenewed(label, price, newExpiration);
@@ -322,7 +343,8 @@ contract ECSRegistrar is
      */
     function withdraw(uint256 amount) external onlyRole(ADMIN_ROLE) {
         require(amount <= address(this).balance, "Insufficient contract balance");
-        payable(msg.sender).transfer(amount);
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "Transfer failed");
     }
 
     /**
@@ -330,7 +352,8 @@ contract ECSRegistrar is
      */
     function withdrawAll() external onlyRole(ADMIN_ROLE) {
         uint256 balance = address(this).balance;
-        payable(msg.sender).transfer(balance);
+        (bool success, ) = payable(msg.sender).call{value: balance}("");
+        require(success, "Transfer failed");
     }
 
 

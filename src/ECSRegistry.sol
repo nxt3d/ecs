@@ -37,9 +37,7 @@ contract ECSRegistry is ERC165, AccessControl {
     event Transfer(bytes32 indexed labelhash, address owner);
     
     // Profile Events
-    event TextChanged(bytes32 indexed labelhash, string key, string value);
-    event AddressChanged(bytes32 indexed labelhash, uint256 coinType, bytes newAddress);
-    event ContenthashChanged(bytes32 indexed labelhash, bytes hash);
+    event ResolverChanged(bytes32 indexed labelhash, address resolver);
     
     // Lock Events
     event labelhashRentalSet(bytes32 indexed labelhash, uint256 expiration);
@@ -48,13 +46,26 @@ contract ECSRegistry is ERC165, AccessControl {
     // Approvals from owners to approved addresses
     mapping(address owner => mapping(address approved => bool)) public approvals;
     
+    // Mapping of resolver addresses to labelhashes to ensure 1-to-1 binding
+    mapping(address resolver => bytes32 labelhash) public resolverToLabelhash;
+
+    event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
+    
+    // Custom Errors (additional)
+    error ResolverAlreadyInUse(address resolver, bytes32 labelhash);
+    error CommitmentNotFound(bytes32 commitment);
+    error CommitmentTooNew(bytes32 commitment);
+    error CommitmentAlreadyExists(bytes32 commitment);
+
+    // Commitments
+    mapping(bytes32 => uint256) public commitments;
+    uint256 public constant MIN_COMMITMENT_AGE = 60;
+
     struct Record {
         address owner;
+        address resolver;
         string label; // Store the original human-readable label
         uint256 expiration; // Expiration timestamp for the name
-        mapping(string key => string value) textRecords;
-        mapping(uint256 coinType => bytes addr) addressRecords;
-        bytes contenthash;
     }
 
     mapping(bytes32 labelhash => Record record) records;
@@ -102,31 +113,21 @@ contract ECSRegistry is ERC165, AccessControl {
     }
 
 
+
     /**
      * @dev Sets a complete record for a labelhash using parent + label pattern
      * @param label The human-readable label for the subdomain (e.g., "alice", "subdomain")
      * @param newOwner The new owner for the labelhash
-     * @param keys Array of text record keys
-     * @param values Array of text record values
-     * @param coinTypes Array of coin types for address records
-     * @param addresses Array of address records
-     * @param contentHash Content hash
+     * @param resolver_ The resolver address for the labelhash
+     * @param expiration The expiration timestamp for the labelhash
      */
     function setLabelhashRecord(
         string memory label,
         address newOwner,
-        uint256 expiration,
-        string[] memory keys,
-        string[] memory values,
-        uint256[] memory coinTypes,
-        bytes[] memory addresses,
-        bytes memory contentHash
+        address resolver_,
+        uint256 expiration
     ) external onlyRole(REGISTRAR_ROLE) returns (bytes32) {
         bytes32 labelhash = keccak256(bytes(label));
-        
-        // Validate array lengths
-        require(keys.length == values.length, KeysArrayLengthMismatch(keys.length, values.length));
-        require(coinTypes.length == addresses.length, CoinTypesArrayLengthMismatch(coinTypes.length, addresses.length));
         
         // Make sure the name is expired (prevents registration of unexpired names)
         require(
@@ -137,6 +138,10 @@ contract ECSRegistry is ERC165, AccessControl {
         // Set owner and expiration
         records[labelhash].owner = newOwner;
         records[labelhash].expiration = expiration;
+        
+        // Set resolver with unique check
+        _updateResolver(labelhash, resolver_);
+        
         emit Transfer(labelhash, newOwner);
         emit NewLabelhashOwner(labelhash, label, newOwner);
         
@@ -145,58 +150,35 @@ contract ECSRegistry is ERC165, AccessControl {
             records[labelhash].label = label;
         }
         
-        // Set text records
-        for (uint i = 0; i < keys.length; i++) {
-            // Set text record only if it is changing
-            if (keccak256(bytes(records[labelhash].textRecords[keys[i]])) != keccak256(bytes(values[i]))) {
-                records[labelhash].textRecords[keys[i]] = values[i];
-                emit TextChanged(labelhash, keys[i], values[i]);
-            }
-        }
-        
-        // Set address records
-        for (uint i = 0; i < coinTypes.length; i++) {
-            // Set address record only if it is changing
-            if (keccak256(records[labelhash].addressRecords[coinTypes[i]]) != keccak256(addresses[i])) {
-                records[labelhash].addressRecords[coinTypes[i]] = addresses[i];
-                emit AddressChanged(labelhash, coinTypes[i], addresses[i]);
-            }
-        }
-        
-        // Set contenthash only if it is changing
-        if (keccak256(records[labelhash].contenthash) != keccak256(contentHash)) {
-            records[labelhash].contenthash = contentHash;
-            emit ContenthashChanged(labelhash, contentHash);
-        }
-        
         return labelhash;
     }
+    /**
+     * @dev Commits a hash for future revealing
+     * @param commitment The hash of the data to be revealed
+     */
+    function commit(bytes32 commitment) external {
+        if (commitments[commitment] != 0) revert CommitmentAlreadyExists(commitment);
+        commitments[commitment] = block.timestamp;
+    }
+
 
     /**
-     * @notice Sets multiple records for a specific labelhash, including owner, text records, address records, and contenthash.
+     * @notice Sets multiple records for a specific labelhash, including owner and resolver.
      * @dev Only the authorized owner or an approved operator can call this function.
-     *      The function allows updating the owner, text records, address records, and contenthash for a given labelhash.
-     *      To skip updating the owner or contenthash, pass an empty array for `newOwners` or `contentHashs` respectively.
-     *      Only one owner and one contenthash can be set at a time.
+     *      The function allows updating the owner and resolver for a given labelhash.
+     *      Only one owner and one resolver can be set at a time.
      * @param labelhash The labelhash of the record to update.
-     * @param newOwner_s Array containing the new owner address. If empty, the owner is not updated.
-     * @param expiration_s Array containing the new expiration. If empty, the expiration is not updated.
-     * @param keys Array of text record keys to set.
-     * @param values Array of text record values to set, corresponding to `keys`.
-     * @param coinTypes Array of coin types for address records to set.
-     * @param addresses Array of address records to set, corresponding to `coinTypes`.
-     * @param contentHash_s Array containing the new contenthash. If empty, the contenthash is not updated.
+     * @param newOwner The new owner address.
+     * @param resolver_ The new resolver address.
+     * @param secret The secret used in the commitment
      */
     function setRecord(
         bytes32 labelhash,
-        address[] memory newOwner_s, // There is only one owner, but the empty array allows for not setting it. 
-        uint256[] memory expiration_s, // There is only one expiration, but the empty array allows for not setting it. 
-        string[] memory keys,
-        string[] memory values,
-        uint256[] memory coinTypes,  
-        bytes[] memory addresses,
-        bytes[] memory contentHash_s // There is only one contenthash, but the empty array allows for not setting it. 
+        address newOwner,
+        address resolver_,
+        bytes32 secret
     ) external authorized(labelhash) {
+        _consumeCommitment(labelhash, newOwner, resolver_, secret);
 
         // Make sure there is a name set for the labelhash
         require(
@@ -204,106 +186,71 @@ contract ECSRegistry is ERC165, AccessControl {
             labelhashNotSet(labelhash)
         );
 
-        // Validate array lengths
-        require(keys.length == values.length, KeysArrayLengthMismatch(keys.length, values.length));
-        require(coinTypes.length == addresses.length, CoinTypesArrayLengthMismatch(coinTypes.length, addresses.length));
-        require(newOwner_s.length <= 1, "Only one owner can be set");
-        require(expiration_s.length <= 1, "Only one expiration can be set");
-        require(contentHash_s.length <= 1, "Only one contenthash can be set");
-
-        // Set owner (allows for not setting it with empty array)
-        if (newOwner_s.length == 1) {
-            records[labelhash].owner = newOwner_s[0];
-            emit Transfer(labelhash, newOwner_s[0]);
-        }
-
-        // Set expiration (allows for not setting it with empty array)
-        if (expiration_s.length == 1) {
-            records[labelhash].expiration = expiration_s[0];
-            emit ExpirationExtended(labelhash, expiration_s[0]);
-        }
+        // Set owner
+        records[labelhash].owner = newOwner;
+        emit Transfer(labelhash, newOwner);
         
-        // Set text records
-        for (uint i = 0; i < keys.length; i++) {
-                records[labelhash].textRecords[keys[i]] = values[i];
-                emit TextChanged(labelhash, keys[i], values[i]);
-        }
-        
-        // Set address records
-        for (uint i = 0; i < coinTypes.length; i++) {
-                records[labelhash].addressRecords[coinTypes[i]] = addresses[i];
-                emit AddressChanged(labelhash, coinTypes[i], addresses[i]);
-        }
-        
-        // Set contenthash (allows for not setting it with empty array)
-        if (contentHash_s.length == 1) {
-            records[labelhash].contenthash = contentHash_s[0];
-            emit ContenthashChanged(labelhash, contentHash_s[0]);
-        }
+        // Set resolver with unique check
+        _updateResolver(labelhash, resolver_);
     }
 
+
     /**
-     * @dev Sets a text record for a specific labelhash
+     * @dev Sets the resolver for a labelhash
      */
-    function setText(
-        bytes32 labelhash,
-        string memory key,
-        string memory value
-    ) external authorized(labelhash) {
-        
-        records[labelhash].textRecords[key] = value;
-        emit TextChanged(labelhash, key, value);
+    function setResolver(bytes32 labelhash, address resolver_, bytes32 secret) external authorized(labelhash) {
+        _consumeCommitment(labelhash, records[labelhash].owner, resolver_, secret);
+        _updateResolver(labelhash, resolver_);
     }
 
     /**
-     * @dev Sets an address record for a specific labelhash
-     */
-    function setAddr(
-        bytes32 labelhash,
-        uint256 coinType,
-        bytes memory address_
-    ) external authorized(labelhash) {
-        
-        records[labelhash].addressRecords[coinType] = address_;
-        emit AddressChanged(labelhash, coinType, address_);
-    }
-
-    /**
-     * @dev Sets ETH address for a labelhash (convenience function)
-     */
-    function setAddr(bytes32 labelhash, address address_) external authorized(labelhash) {
-        
-        records[labelhash].addressRecords[60] = abi.encodePacked(address_);
-        emit AddressChanged(labelhash, 60, abi.encodePacked(address_));
-    }
-
-    /**
-     * @dev Sets content hash for a specific labelhash
-     */
-    function setContenthash(
-        bytes32 labelhash,
-        bytes memory contentHash
-    ) external authorized(labelhash) {
-        
-        records[labelhash].contenthash = contentHash;
-        emit ContenthashChanged(labelhash, contentHash);
-    }
-
-    /**
-     * @dev Sets approval for an operator to manage all caller's labelhashes
-     * @param operator The address to approve or revoke approval for
-     * @param approved Whether to approve or revoke approval
+     * @dev Sets or unsets the approval of a given operator
+     * @param operator The address to approve or disapprove
+     * @param approved The approval status to set
      */
     function setApprovalForAll(address operator, bool approved) external {
-        // Users can only set approvals for themselves
         approvals[msg.sender][operator] = approved;
+        emit ApprovalForAll(msg.sender, operator, approved);
     }
 
     /**
-     * @dev Checks if operator is approved for owner
+     * @dev Internal function to update the resolver and ensure 1-to-1 mapping
      */
-    function isApprovedForAll(address labelhashOwner, address operator) external view returns (bool) {
-        return approvals[labelhashOwner][operator];
+    function _updateResolver(bytes32 labelhash, address newResolver) internal {
+        address oldResolver = records[labelhash].resolver;
+        
+        // If the resolver is changing
+        if (oldResolver != newResolver) {
+            // Clean up old mapping
+            if (oldResolver != address(0)) {
+                delete resolverToLabelhash[oldResolver];
+            }
+            
+            // Validate and set new mapping
+            if (newResolver != address(0)) {
+                // Check if new resolver is already used by another labelhash
+                if (resolverToLabelhash[newResolver] != bytes32(0)) {
+                    revert ResolverAlreadyInUse(newResolver, resolverToLabelhash[newResolver]);
+                }
+                resolverToLabelhash[newResolver] = labelhash;
+            }
+            
+            records[labelhash].resolver = newResolver;
+            emit ResolverChanged(labelhash, newResolver);
+        }
+    }
+
+    /**
+     * @dev Internal function to verify and consume a commitment
+     */
+    function _consumeCommitment(bytes32 labelhash, address owner, address resolver, bytes32 secret) internal {
+        bytes32 commitment = keccak256(abi.encodePacked(labelhash, owner, resolver, secret));
+        uint256 timestamp = commitments[commitment];
+        
+        if (timestamp == 0) revert CommitmentNotFound(commitment);
+        if (block.timestamp < timestamp + MIN_COMMITMENT_AGE) revert CommitmentTooNew(commitment);
+        
+        delete commitments[commitment];
     }
 
     // View Functions
@@ -317,31 +264,10 @@ contract ECSRegistry is ERC165, AccessControl {
     }
 
     /**
-     * @dev Gets a text record
+     * @dev Gets the resolver of a labelhash
      */
-    function text(bytes32 labelhash, string memory key) external view returns (string memory) {
-        return records[labelhash].textRecords[key];
-    }
-
-    /**
-     * @dev Gets an address record (with override priority)
-     */
-    function addr(bytes32 labelhash, uint256 coinType) external view returns (bytes memory) {
-        return records[labelhash].addressRecords[coinType];
-    }
-
-    /**
-     * @dev Gets ETH address for a labelhash (convenience function)
-     */
-    function addr(bytes32 labelhash) external view returns (address payable) {
-        return payable(address(bytes20(records[labelhash].addressRecords[60])));
-    }
-
-    /**
-     * @dev Gets content hash
-     */
-    function contenthash(bytes32 labelhash) external view returns (bytes memory) {
-        return records[labelhash].contenthash;
+    function resolver(bytes32 labelhash) external view returns (address) {
+        return records[labelhash].resolver;
     }
 
     /**
@@ -377,6 +303,13 @@ contract ECSRegistry is ERC165, AccessControl {
      */
     function isExpired(bytes32 labelhash) external view returns (bool) {
         return block.timestamp > records[labelhash].expiration;
+    }
+
+    /**
+     * @dev Helper to create a commitment hash
+     */
+    function createCommitment(bytes32 labelhash, address owner, address resolver, bytes32 secret) external pure returns (bytes32) {
+        return keccak256(abi.encodePacked(labelhash, owner, resolver, secret));
     }
 
     /**
