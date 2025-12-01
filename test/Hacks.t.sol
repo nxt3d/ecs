@@ -4,6 +4,8 @@ pragma solidity ^0.8.27;
 import "forge-std/Test.sol";
 import "../src/ECSRegistry.sol";
 import "../src/ECSRegistrar.sol";
+import "../src/ENSRegistry.sol";
+import "../src/ENS.sol";
 
 contract HacksTest is Test {
     /* --- Test Accounts --- */
@@ -17,15 +19,29 @@ contract HacksTest is Test {
     
     ECSRegistry public registry;
     ECSRegistrar public registrar;
+    ENSRegistry public ensRegistry;
+    bytes32 public rootNode;
     
     /* --- Setup --- */
     
     function setUp() public {
         vm.startPrank(admin);
-        registry = new ECSRegistry();
+        
+        // 1. Deploy ENS Registry
+        ensRegistry = new ENSRegistry();
+        
+        // 2. Setup ecs.eth node
+        bytes32 ethNode = ensRegistry.setSubnodeOwner(bytes32(0), keccak256("eth"), admin);
+        rootNode = ensRegistry.setSubnodeOwner(ethNode, keccak256("ecs"), admin);
+        
+        // 3. Deploy ECS Registry
+        registry = new ECSRegistry(ensRegistry, rootNode);
         registrar = new ECSRegistrar(registry);
         
         registry.grantRole(registry.REGISTRAR_ROLE(), address(registrar));
+        
+        // 4. Transfer ecs.eth ownership to ECS Registry
+        ensRegistry.setOwner(rootNode, address(registry));
         
         // Setup generic pricing settings
         registrar.setParams(60, type(uint64).max, 3, 64);

@@ -14,6 +14,8 @@ pragma solidity ^0.8.27;
 
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "./ENS.sol";
+import "./utils/NameCoder.sol";
 
 
 contract ECSRegistry is ERC165, AccessControl {
@@ -21,6 +23,10 @@ contract ECSRegistry is ERC165, AccessControl {
     // Roles
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
+
+    // ENS Integration
+    ENS public immutable ens;
+    bytes32 public immutable rootNode;
 
     // Custom Errors
     error NotAuthorised(bytes32 labelhash, address caller);
@@ -63,7 +69,6 @@ contract ECSRegistry is ERC165, AccessControl {
 
     struct Record {
         address owner;
-        address resolver;
         string label; // Store the original human-readable label
         uint256 expiration; // Expiration timestamp for the name
     }
@@ -95,10 +100,13 @@ contract ECSRegistry is ERC165, AccessControl {
     }
 
 
-    constructor() {
+    constructor(ENS _ens, bytes32 _rootNode) {
         // Set up roles
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(ADMIN_ROLE, msg.sender);
+        
+        ens = _ens;
+        rootNode = _rootNode;
     }
 
     // Registry Functions
@@ -217,7 +225,12 @@ contract ECSRegistry is ERC165, AccessControl {
      * @dev Internal function to update the resolver and ensure 1-to-1 mapping
      */
     function _updateResolver(bytes32 labelhash, address newResolver) internal {
-        address oldResolver = records[labelhash].resolver;
+        bytes32 node = NameCoder.namehash(rootNode, labelhash);
+        address oldResolver = address(0);
+        
+        if (address(ens) != address(0)) {
+            oldResolver = ens.resolver(node);
+        }
         
         // If the resolver is changing
         if (oldResolver != newResolver) {
@@ -235,7 +248,13 @@ contract ECSRegistry is ERC165, AccessControl {
                 resolverToLabelhash[newResolver] = labelhash;
             }
             
-            records[labelhash].resolver = newResolver;
+            // records[labelhash].resolver removed
+            
+            // Update ENS Registry
+            if (address(ens) != address(0)) {
+                ens.setSubnodeRecord(rootNode, labelhash, address(this), newResolver, 0);
+            }
+            
             emit ResolverChanged(labelhash, newResolver);
         }
     }
@@ -267,7 +286,9 @@ contract ECSRegistry is ERC165, AccessControl {
      * @dev Gets the resolver of a labelhash
      */
     function resolver(bytes32 labelhash) external view returns (address) {
-        return records[labelhash].resolver;
+        if (address(ens) == address(0)) return address(0);
+        bytes32 node = NameCoder.namehash(rootNode, labelhash);
+        return ens.resolver(node);
     }
 
     /**

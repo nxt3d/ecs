@@ -4,9 +4,13 @@ pragma solidity ^0.8.27;
 import "forge-std/Test.sol";
 import "../src/ECSRegistry.sol";
 import "../src/ECSRegistrar.sol";
-import "../src/ECSResolver.sol";
 import "../src/CredentialResolver.sol";
-import "../src/utils/NameCoder.sol";
+import "../src/ENSRegistry.sol";
+import "../src/ENS.sol";
+
+interface ITextResolver {
+    function text(bytes32 node, string calldata key) external view returns (string memory);
+}
 
 contract IntegrationTest is Test {
     /* --- Test Accounts --- */
@@ -19,8 +23,10 @@ contract IntegrationTest is Test {
     
     ECSRegistry public registry;
     ECSRegistrar public registrar;
-    ECSResolver public mainResolver;
+    ENSRegistry public ensRegistry;
     CredentialResolver public providerResolver;
+    
+    bytes32 public rootNode;
     
     /* --- Constants --- */
     
@@ -31,13 +37,24 @@ contract IntegrationTest is Test {
     /* --- Setup --- */
     
     function setUp() public {
-        // 1. Deploy core contracts
         vm.startPrank(admin);
-        registry = new ECSRegistry();
-        registrar = new ECSRegistrar(registry);
-        mainResolver = new ECSResolver(registry);
         
+        // 1. Deploy ENS Registry
+        ensRegistry = new ENSRegistry();
+        
+        // 2. Setup ecs.eth node
+        bytes32 ethNode = ensRegistry.setSubnodeOwner(bytes32(0), keccak256("eth"), admin);
+        rootNode = ensRegistry.setSubnodeOwner(ethNode, keccak256("ecs"), admin);
+        
+        // 3. Deploy ECS Registry
+        registry = new ECSRegistry(ensRegistry, rootNode);
+        
+        // 4. Deploy Registrar
+        registrar = new ECSRegistrar(registry);
         registry.grantRole(registry.REGISTRAR_ROLE(), address(registrar));
+        
+        // 5. Transfer ecs.eth ownership to ECS Registry
+        ensRegistry.setOwner(rootNode, address(registry));
         
         // Setup pricing
         uint256[] memory prices = new uint256[](1);
@@ -78,7 +95,6 @@ contract IntegrationTest is Test {
         vm.startPrank(provider);
         
         // Register the name with the provider's resolver
-        // Note: ECSRegistrar.register takes (label, owner, resolver, duration)
         registrar.register{value: price}(
             PROVIDER_LABEL,
             provider,
@@ -87,60 +103,41 @@ contract IntegrationTest is Test {
             secret
         );
         
-        // Verify registration
+        // Verify registration in ECS Registry
         bytes32 labelhash = keccak256(bytes(PROVIDER_LABEL));
         assertEq(registry.owner(labelhash), provider);
         assertEq(registry.resolver(labelhash), address(providerResolver));
         
+        // Verify registration in ENS Registry
+        // node = keccak256(rootNode, labelhash)
+        bytes32 providerNode = keccak256(abi.encodePacked(rootNode, labelhash));
+        assertEq(ensRegistry.owner(providerNode), address(registry)); // Owned by ECS Registry
+        assertEq(ensRegistry.resolver(providerNode), address(providerResolver)); // Resolver set to provider's resolver
+        
         // 2. Provider sets up the credential record
-        // "key eth.ecs.star-protocol.star:vitalik.eth"
-        // We map this key to "5" (stars)
         string memory credentialKey = "eth.ecs.star-protocol.star:vitalik.eth";
         string memory starCount = "5";
         
-        // CredentialResolver uses the labelhash of the *provider*? 
-        // No, CredentialResolver is generic. It uses whatever node hash is passed to it.
-        // But ECSResolver forwards the call with the DNS name "star-protocol.ecs.eth" (or similar).
-        // The `resolve` function in CredentialResolver extracts the label from the name to determine the node?
+        // We need to set the record on the `providerNode`? 
+        // The credential resolver receives the `node` in `text(bytes32 node, string key)`.
+        // The node passed by standard ENS clients is the namehash of "star-protocol.ecs.eth".
+        // This matches `providerNode`.
         
-        // Let's look at CredentialResolver.resolve:
-        // (bytes32 labelhash,) = NameCoder.readLabel(name, 0);
-        // It extracts the first label of the name passed to it.
-        
-        // So if we call ECSResolver with name="star-protocol.ecs.eth", 
-        // ECSResolver extracts "star-protocol", finds providerResolver.
-        // Then calls providerResolver.resolve("star-protocol.ecs.eth", ...).
-        // ProviderResolver extracts "star-protocol" -> labelhash.
-        // Then looks up record for that labelhash.
-        
-        // So the provider must set the record on the "star-protocol" labelhash in their resolver.
-        // Note: In CredentialResolver, we need to ensure we own that labelhash or are authorized.
-        // Since provider deployed it, they are owner() of the contract, so they can set anything.
-        // Or they can setLabelOwner(labelhash, provider).
-        
-        // Let's explicitly set label ownership in the resolver for clarity/good practice
-        providerResolver.setLabelOwner(labelhash, provider);
-        
-        // Set the text record
-        providerResolver.setText(labelhash, credentialKey, starCount);
+        // Provider sets the text record on their resolver
+        providerResolver.setLabelOwner(providerNode, provider);
+        providerResolver.setText(providerNode, credentialKey, starCount);
         
         vm.stopPrank();
         
-        // 3. User resolves the credential
+        // 3. User resolves the credential via ENS
         vm.startPrank(user);
         
-        bytes memory name = NameCoder.encode("star-protocol.ecs.eth");
-        bytes memory data = abi.encodeWithSelector(
-            bytes4(keccak256("text(bytes32,string)")),
-            bytes32(0), // node is ignored by ECSResolver/CredentialResolver logic which extracts from name
-            credentialKey
-        );
+        // User looks up resolver from ENS
+        address resolvedResolver = ensRegistry.resolver(providerNode);
+        assertEq(resolvedResolver, address(providerResolver));
         
-        // Call the main ECS resolver
-        bytes memory result = mainResolver.resolve(name, data);
-        
-        // Decode and verify
-        string memory resolvedValue = abi.decode(result, (string));
+        // User calls resolver directly
+        string memory resolvedValue = ITextResolver(resolvedResolver).text(providerNode, credentialKey);
         assertEq(resolvedValue, "5");
         
         vm.stopPrank();
@@ -151,99 +148,20 @@ contract IntegrationTest is Test {
         test_001____Integration____StarProtocolFlow();
         
         bytes32 labelhash = keccak256(bytes(PROVIDER_LABEL));
+        bytes32 providerNode = keccak256(abi.encodePacked(rootNode, labelhash));
         string memory credentialKey = "eth.ecs.star-protocol.star:vitalik.eth";
         
         // Provider updates stars to 10
         vm.startPrank(provider);
-        providerResolver.setText(labelhash, credentialKey, "10");
+        providerResolver.setText(providerNode, credentialKey, "10");
         vm.stopPrank();
         
         // User resolves again
         vm.startPrank(user);
         
-        bytes memory name = NameCoder.encode("star-protocol.ecs.eth");
-        bytes memory data = abi.encodeWithSelector(
-            bytes4(keccak256("text(bytes32,string)")),
-            bytes32(0),
-            credentialKey
-        );
-        
-        bytes memory result = mainResolver.resolve(name, data);
-        string memory resolvedValue = abi.decode(result, (string));
+        string memory resolvedValue = ITextResolver(address(providerResolver)).text(providerNode, credentialKey);
         assertEq(resolvedValue, "10");
         
         vm.stopPrank();
     }
-    
-    function test_003____Integration____ExpiredNamespace() public {
-         // 1. Provider registers "star-protocol"
-        uint256 price = registrar.rentPrice(PROVIDER_LABEL, DURATION);
-        bytes32 secret = bytes32(uint256(1));
-        
-        vm.startPrank(provider);
-        providerResolver = new CredentialResolver(provider);
-        
-        // Commit
-        bytes32 commitment = registrar.createCommitment(PROVIDER_LABEL, provider, address(providerResolver), DURATION, secret);
-        registrar.commit(commitment);
-        vm.stopPrank();
-        
-        vm.warp(block.timestamp + 60);
-        
-        vm.startPrank(provider);
-        
-        registrar.register{value: price}(
-            PROVIDER_LABEL,
-            provider,
-            address(providerResolver),
-            DURATION,
-            secret
-        );
-        
-        // Set record
-        bytes32 labelhash = keccak256(bytes(PROVIDER_LABEL));
-        string memory credentialKey = "test";
-        providerResolver.setLabelOwner(labelhash, provider);
-        providerResolver.setText(labelhash, credentialKey, "val");
-        vm.stopPrank();
-        
-        // 2. Expiration happens
-        vm.warp(block.timestamp + DURATION + 1);
-        
-        // 3. User tries to resolve
-        // Note: ECSResolver.resolve checks:
-        // address resolver = registry.resolver(labelHash);
-        // ECSRegistry.resolver(labelHash) is a view function returning records[labelhash].resolver
-        // It DOES NOT check expiration. Expiration is checked in `authorizedOrRegistrar` modifier for WRITES.
-        // Reads usually return data even if expired in standard ENS, unless explicitly blocked.
-        
-        // Let's check ECSRegistry.sol view functions.
-        // `function resolver(bytes32 labelhash) external view returns (address)` -> just returns value.
-        
-        // However, ECSResolver logic might (or should?) check if expired?
-        // ECSResolver.sol:
-        // address resolver = registry.resolver(labelHash);
-        // It does not check expiration explicitly.
-        
-        // So it should still resolve? 
-        // If the user intention is that expired names stop working, then ECSResolver should check `registry.isExpired(labelHash)`.
-        // But typically in ENS, the resolver is still set until someone else claims it.
-        
-        // Let's verify current behavior (success)
-        vm.startPrank(user);
-        
-        bytes memory name = NameCoder.encode("star-protocol.ecs.eth");
-        bytes memory data = abi.encodeWithSelector(
-            bytes4(keccak256("text(bytes32,string)")),
-            bytes32(0),
-            credentialKey
-        );
-        
-        bytes memory result = mainResolver.resolve(name, data);
-        string memory resolvedValue = abi.decode(result, (string));
-        assertEq(resolvedValue, "val");
-        
-        vm.stopPrank();
-    }
 }
-

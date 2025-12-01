@@ -201,7 +201,7 @@ contract CredentialResolver is Ownable, IERC165, IExtendedResolver {
      * @param _coinType The coin type (default: 60 for Ethereum).
      * @return The address for this label and coin type.
      */
-    function getAddr(bytes32 _labelhash, uint256 _coinType) external view returns (bytes memory) {
+    function addr(bytes32 _labelhash, uint256 _coinType) external view returns (bytes memory) {
         return addressRecords[_labelhash][_coinType];
     }
 
@@ -210,7 +210,7 @@ contract CredentialResolver is Ownable, IERC165, IExtendedResolver {
      * @param _labelhash The labelhash to query.
      * @return The content hash for this label.
      */
-    function getContenthash(bytes32 _labelhash) external view returns (bytes memory) {
+    function contenthash(bytes32 _labelhash) external view returns (bytes memory) {
         return contenthashRecords[_labelhash];
     }
 
@@ -220,7 +220,7 @@ contract CredentialResolver is Ownable, IERC165, IExtendedResolver {
      * @param _key The text record key.
      * @return The text record value.
      */
-    function getText(bytes32 _labelhash, string calldata _key) external view returns (string memory) {
+    function text(bytes32 _labelhash, string calldata _key) external view returns (string memory) {
         return textRecords[_labelhash][_key];
     }
 

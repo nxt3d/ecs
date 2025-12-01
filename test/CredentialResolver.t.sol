@@ -62,7 +62,7 @@ contract CredentialResolverTest is Test {
         resolver.setAddr(LABELHASH, addr);
         
         // Direct get
-        bytes memory result = resolver.getAddr(LABELHASH, 60);
+        bytes memory result = resolver.addr(LABELHASH, 60);
         // addressRecords stores bytes packed address (20 bytes), so abi.decode would fail
         
         address resolvedAddr2;
@@ -79,7 +79,7 @@ contract CredentialResolverTest is Test {
         vm.prank(user);
         resolver.setText(LABELHASH, key, value);
         
-        assertEq(resolver.getText(LABELHASH, key), value);
+        assertEq(resolver.text(LABELHASH, key), value);
     }
     
     function test_005____setContenthash______________SetsAndGetsContenthash() public {
@@ -88,7 +88,7 @@ contract CredentialResolverTest is Test {
         vm.prank(user);
         resolver.setContenthash(LABELHASH, hash);
         
-        assertEq(resolver.getContenthash(LABELHASH), hash);
+        assertEq(resolver.contenthash(LABELHASH), hash);
     }
     
     function test_006____setData_____________________SetsAndGetsData() public {

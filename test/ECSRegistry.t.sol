@@ -3,6 +3,8 @@ pragma solidity ^0.8.27;
 
 import "forge-std/Test.sol";
 import "../src/ECSRegistry.sol";
+import "../src/ENSRegistry.sol";
+import "../src/ENS.sol";
 
 contract ECSRegistryTest is Test {
     /* --- Test Accounts --- */
@@ -17,6 +19,8 @@ contract ECSRegistryTest is Test {
     /* --- Contract Variables --- */
     
     ECSRegistry public registry;
+    ENSRegistry public ensRegistry;
+    bytes32 public rootNode;
     
     /* --- Domain Variables --- */
     
@@ -28,8 +32,23 @@ contract ECSRegistryTest is Test {
     
     function setUp() public {
         vm.startPrank(admin);
-        registry = new ECSRegistry();
+        
+        // 1. Deploy ENS Registry
+        ensRegistry = new ENSRegistry();
+        
+        // 2. Setup ecs.eth node
+        // .eth
+        bytes32 ethNode = ensRegistry.setSubnodeOwner(bytes32(0), keccak256("eth"), admin);
+        // ecs.eth
+        rootNode = ensRegistry.setSubnodeOwner(ethNode, keccak256("ecs"), admin);
+        
+        // 3. Deploy ECS Registry
+        registry = new ECSRegistry(ensRegistry, rootNode);
         registry.grantRole(registry.REGISTRAR_ROLE(), registrar);
+        
+        // 4. Transfer ecs.eth ownership to ECS Registry
+        ensRegistry.setOwner(rootNode, address(registry));
+        
         vm.stopPrank();
         
         labelhash = keccak256(bytes(LABEL));

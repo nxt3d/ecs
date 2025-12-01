@@ -16,23 +16,18 @@ ECS V2 is built to be fully compatible with the [ENS Hooks standard](https://git
 
 ### 1. ECS Registry (`ECSRegistry.sol`)
 The core contract. It maintains a mapping of:
-`LabelHash -> (Owner, Resolver Address, Expiration)`
+`LabelHash -> (Owner, Expiration)`
 
-*   **Flat Structure:** No subnames. Just `label` -> `resolver`.
-*   **Ownership:** Owners may update the resolver address.
+*   **ENS Integration:** When a label is registered, ECS automatically creates the corresponding subname (e.g., `my-service.ecs.eth`) in the official **ENS Registry**.
+*   **Resolver Management:** The resolver address is stored directly on the ENS Registry record for that subname.
+*   **Ownership:** ECS retains ownership of the ENS subnode to ensure protocol rules, while the logical owner manages the record via the ECS Registry.
 *   **Commit/Reveal:** Secure updates using a commitment pattern to prevent front-running.
 
-### 2. ECS Resolver (`ECSResolver.sol`)
-The main entry point for resolving credentials via ECS.
-*   It implements `IExtendedResolver`.
-*   When queried (e.g., via `resolve(name, data)`), it looks up the specific credential resolver for that name in the **ECS Registry**.
-*   It then forwards the request to that resolver using `CCIP-Read`, enabling seamless offchain data resolution (e.g., from L2s or gateways).
-
-### 3. Known Resolvers
+### 2. Known Resolvers
 These are contracts that are built and registered. They can be:
 *   **Onchain Resolvers:** Storing attestation data directly on Ethereum.
 *   **Offchain/L2 Resolvers:** Using CCIP-Read to fetch data from Optimism, Base, or a centralized server, verified by signatures or proofs.
-*   **Standard ENS Resolvers:** Since they implement `IExtendedResolver`, they work just like any other ENS resolver.
+*   **Standard ENS Resolvers:** Since they implement standard ENS methods (`text`, `addr`, etc.), they work with any ENS client.
 
 ## Usage Flow with Hooks
 

@@ -4,6 +4,8 @@ pragma solidity ^0.8.27;
 import "forge-std/Test.sol";
 import "../src/ECSRegistry.sol";
 import "../src/ECSRegistrar.sol";
+import "../src/ENSRegistry.sol";
+import "../src/ENS.sol";
 
 contract ECSRegistrarTest is Test {
     /* --- Test Accounts --- */
@@ -17,6 +19,8 @@ contract ECSRegistrarTest is Test {
     
     ECSRegistry public registry;
     ECSRegistrar public registrar;
+    ENSRegistry public ensRegistry;
+    bytes32 public rootNode;
     
     /* --- Domain Variables --- */
     
@@ -29,14 +33,24 @@ contract ECSRegistrarTest is Test {
     function setUp() public {
         vm.startPrank(admin);
         
-        // Deploy Registry
-        registry = new ECSRegistry();
+        // 1. Deploy ENS Registry
+        ensRegistry = new ENSRegistry();
         
-        // Deploy Registrar
+        // 2. Setup ecs.eth node
+        bytes32 ethNode = ensRegistry.setSubnodeOwner(bytes32(0), keccak256("eth"), admin);
+        rootNode = ensRegistry.setSubnodeOwner(ethNode, keccak256("ecs"), admin);
+        
+        // 3. Deploy ECS Registry
+        registry = new ECSRegistry(ensRegistry, rootNode);
+        
+        // 4. Deploy Registrar
         registrar = new ECSRegistrar(registry);
         
-        // Grant Registrar Role
+        // 5. Grant Registrar Role
         registry.grantRole(registry.REGISTRAR_ROLE(), address(registrar));
+        
+        // 6. Transfer ecs.eth ownership to ECS Registry
+        ensRegistry.setOwner(rootNode, address(registry));
         
         // Configure Registrar Params
         registrar.setParams(
