@@ -39,11 +39,154 @@ Hooks enable ENS names to redirect queries to known resolvers.
     ```
 2.  **Client** reads this record and extracts the `<ECS_RESOLVER_ADDRESS>`.
 3.  **Client** calls `getLabelByResolver(<ECS_RESOLVER_ADDRESS>)` on the ECS Registry to find its registered label (e.g., `my-service`).
-4.  **Client** constructs the service name `my-service.ecs.eth`.
-5.  **Client** resolves the original query (e.g., `text(node, "proof-of-person")`) against `my-service.ecs.eth`.
+4.  **Client** constructs the service name `my-service.ecs.eth` (optional, for provenance).
+5.  **Client** queries the resolver directly: `text(node, "credential-key")`.
+    - Note: Single-label resolvers ignore the `node` parameter, so any value (including `0x0`) works.
 6.  **Resolver** returns the verified credential data.
 
 This creates a trusted link to the record, where `maria.eth` doesn't store the record herself; instead, the record can be resolved against a "known" trusted resolver.
+
+### Example: Resolving a Hook
+
+```javascript
+import { createPublicClient, http } from 'viem'
+import { sepolia } from 'viem/chains'
+
+const client = createPublicClient({
+  chain: sepolia,
+  transport: http('https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY')
+})
+
+// Step 1: User has hook pointing to resolver
+const resolverAddress = '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e'
+
+// Step 2: Get label from ECS Registry
+const label = await client.readContract({
+  address: '0x016BfbF42131004401ABdfe208F17A1620faB742', // ECS Registry
+  abi: [{
+    name: 'getLabelByResolver',
+    type: 'function',
+    inputs: [{ name: 'resolver_', type: 'address' }],
+    outputs: [{ name: '', type: 'string' }]
+  }],
+  functionName: 'getLabelByResolver',
+  args: [resolverAddress]
+})
+// Returns: "name-stars"
+
+// Step 3: Query resolver for credential (node can be any value)
+const credential = await client.readContract({
+  address: resolverAddress,
+  abi: [{
+    name: 'text',
+    type: 'function',
+    inputs: [
+      { name: 'node', type: 'bytes32' },
+      { name: 'key', type: 'string' }
+    ],
+    outputs: [{ name: '', type: 'string' }]
+  }],
+  functionName: 'text',
+  args: ['0x0000000000000000000000000000000000000000000000000000000000000000', 'eth.ecs.name-stars.starts:vitalik.eth']
+})
+// Returns: "100"
+```
+
+## Deployments
+
+### Sepolia Testnet
+
+**Date:** December 2, 2025  
+**Network:** Sepolia (Chain ID: 11155111)  
+**Status:** ✅ Live and operational
+
+#### Deployed Contracts
+
+| Contract | Address |
+|----------|---------|
+| ECS Registry | `0x016BfbF42131004401ABdfe208F17A1620faB742` |
+| ECS Registrar | `0x7aDf2626E846aC3a36ac72f25B8329C893b45e12` |
+| Credential Resolver (name-stars) | `0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e` |
+
+#### Configuration
+
+- **Root Name:** `ecs.eth`
+- **Root Node:** `0xe436ba58406c69a63a9611a11eb52314c5c17ba9eaaa7dab8506fe8849517286`
+- **Deployer:** `0xF8e03bd4436371E0e2F7C02E529b2172fe72b4EF`
+- **Registrar Pricing:** ~0.001 ETH/year (32000 wei/second)
+- **Min Commitment Age:** 60 seconds
+
+#### Registered Labels
+
+##### name-stars.ecs.eth
+
+- **Status:** ✅ Registered
+- **Owner:** `0xF8e03bd4436371E0e2F7C02E529b2172fe72b4EF`
+- **Resolver:** `0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e`
+- **Expires:** December 2, 2026
+
+**Credential Records:**
+- **Key:** `eth.ecs.name-stars.starts:vitalik.eth`
+- **Text Value:** `"100"`
+- **Data Value:** `100` (uint256)
+
+#### Query Examples
+
+**Using Cast:**
+
+```bash
+# Get label from resolver address (for Hooks)
+cast call 0x016BfbF42131004401ABdfe208F17A1620faB742 \
+  "getLabelByResolver(address)(string)" \
+  0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e \
+  --rpc-url https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
+# Returns: "name-stars"
+```
+
+**Using Viem:**
+
+```javascript
+import { createPublicClient, http } from 'viem'
+import { sepolia } from 'viem/chains'
+
+const client = createPublicClient({
+  chain: sepolia,
+  transport: http('https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY')
+})
+
+// Get label from resolver address (for Hooks)
+const label = await client.readContract({
+  address: '0x016BfbF42131004401ABdfe208F17A1620faB742',
+  abi: [{
+    name: 'getLabelByResolver',
+    type: 'function',
+    inputs: [{ name: 'resolver_', type: 'address' }],
+    outputs: [{ name: '', type: 'string' }]
+  }],
+  functionName: 'getLabelByResolver',
+  args: ['0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e']
+})
+// Returns: "name-stars"
+
+// Query credential using ENS methods
+const ensName = `${label}.ecs.eth`
+const credentialKey = 'eth.ecs.name-stars.starts:vitalik.eth'
+
+const credential = await client.getEnsText({
+  name: ensName,
+  key: credentialKey
+})
+// Returns: "100"
+```
+
+**Run the demo:**
+
+```bash
+npm run hook  # Full Hooks resolution flow
+npm run resolve  # Direct text record resolution
+```
+
+For full deployment details, see `deployments/sepolia-2025-12-02-03.md`
 
 ## Getting Started
 
@@ -61,4 +204,8 @@ forge test
 
 ### Deploy
 
-(Add deployment instructions here)
+See deployment scripts in `script/`:
+- `DeployAndCommit.s.sol` - Deploy contracts and commit registration
+- `RegisterAndSetup.s.sol` - Complete registration after 60s wait
+
+For full deployment details, see `deployments/sepolia-2025-12-02-03.md`

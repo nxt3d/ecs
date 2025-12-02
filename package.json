@@ -1,0 +1,13 @@
+{
+  "name": "@ecs/scripts",
+  "version": "2.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "resolve": "node scripts/resolve-text-record.js",
+    "hook": "node scripts/resolve-via-hook.js"
+  },
+  "dependencies": {
+    "viem": "^2.21.54"
+  }
+}
