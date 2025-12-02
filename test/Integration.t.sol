@@ -123,9 +123,9 @@ contract IntegrationTest is Test {
         // The node passed by standard ENS clients is the namehash of "star-protocol.ecs.eth".
         // This matches `providerNode`.
         
-        // Provider sets the text record on their resolver
-        providerResolver.setLabelOwner(providerNode, provider);
-        providerResolver.setText(providerNode, credentialKey, starCount);
+        // Provider sets the text record on their resolver (owner only, single-label resolver)
+        vm.prank(provider);
+        providerResolver.setText(credentialKey, starCount);
         
         vm.stopPrank();
         
@@ -153,7 +153,8 @@ contract IntegrationTest is Test {
         
         // Provider updates stars to 10
         vm.startPrank(provider);
-        providerResolver.setText(providerNode, credentialKey, "10");
+        vm.prank(provider);
+        providerResolver.setText(credentialKey, "10");
         vm.stopPrank();
         
         // User resolves again
