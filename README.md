@@ -81,6 +81,14 @@ const credential = await resolveCredential(client, resolverAddress, credentialKe
 // Or get just the label
 const label = await getLabelByResolver(client, resolverAddress)
 // Returns: "name-stars"
+
+// You can also use viem's ENS functions directly
+const ensName = `${label}.ecs.eth`
+const textValue = await client.getEnsText({
+  name: ensName,
+  key: credentialKey
+})
+// Returns: "100"
 ```
 
 ## Deployments
