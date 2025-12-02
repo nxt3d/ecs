@@ -1,25 +1,15 @@
-import { createPublicClient, http } from 'viem'
-import { sepolia } from 'viem/chains'
+import { 
+  createECSClient, 
+  sepolia,
+  getLabelByResolver, 
+  resolveCredential 
+} from '../lib/ecsjs.js'
 
 // Create a client for Sepolia
-const client = createPublicClient({
+const client = createECSClient({
   chain: sepolia,
-  transport: http('https://eth-sepolia.g.alchemy.com/v2/0rXVfxycbHEigHX96u1p-G02VKeV2AS5')
+  rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/0rXVfxycbHEigHX96u1p-G02VKeV2AS5'
 })
-
-// Contract addresses
-const ECS_REGISTRY = '0x016BfbF42131004401ABdfe208F17A1620faB742'
-
-// ECS Registry ABI
-const ecsRegistryAbi = [
-  {
-    name: 'getLabelByResolver',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'resolver_', type: 'address' }],
-    outputs: [{ name: '', type: 'string' }]
-  }
-]
 
 async function resolveViaHook(resolverAddress, credentialKey) {
   console.log('\n🔗 ENS Hooks Resolution Flow')
@@ -27,14 +17,9 @@ async function resolveViaHook(resolverAddress, credentialKey) {
   console.log(`\n📍 Starting with resolver address: ${resolverAddress}`)
   console.log(`🔑 Credential key: ${credentialKey}\n`)
   
-  // Step 1: Get label from ECS Registry
+  // Step 1: Get label from ECS Registry using ecsjs
   console.log('Step 1: Query ECS Registry for label...')
-  const label = await client.readContract({
-    address: ECS_REGISTRY,
-    abi: ecsRegistryAbi,
-    functionName: 'getLabelByResolver',
-    args: [resolverAddress]
-  })
+  const label = await getLabelByResolver(client, resolverAddress)
   console.log(`   ✅ Label: "${label}"`)
   
   // Step 2: Construct full ENS name
@@ -55,11 +40,8 @@ async function resolveViaHook(resolverAddress, credentialKey) {
   }
   
   // Step 4: Query text record using ENS method
-  console.log(`\nStep 4: Query text record using ENS method...`)
-  const textValue = await client.getEnsText({
-    name: fullName,
-    key: credentialKey
-  })
+  console.log(`\nStep 4: Query credential using ecsjs...`)
+  const textValue = await resolveCredential(client, resolverAddress, credentialKey)
   console.log(`   ✅ Text Record Value: "${textValue}"`)
   
   console.log('\n' + '='.repeat(50))

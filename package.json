@@ -1,13 +1,37 @@
 {
-  "name": "@ecs/scripts",
+  "name": "@nxt3d/ecsjs",
   "version": "2.0.0",
   "type": "module",
-  "private": true,
+  "description": "Ethereum Credential Service V2 JavaScript Library",
+  "main": "lib/ecsjs.js",
+  "exports": {
+    ".": "./lib/ecsjs.js"
+  },
   "scripts": {
     "resolve": "node scripts/resolve-text-record.js",
-    "hook": "node scripts/resolve-via-hook.js"
+    "hook": "node scripts/resolve-via-hook.js",
+    "test": "node scripts/test-query.js"
+  },
+  "peerDependencies": {
+    "viem": "^2.x"
   },
   "dependencies": {
     "viem": "^2.21.54"
+  },
+  "keywords": [
+    "ens",
+    "ethereum",
+    "credentials",
+    "web3",
+    "ecs",
+    "v2"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nxt3d/ecs.git",
+    "directory": "."
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

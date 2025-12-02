@@ -10,28 +10,25 @@ const client = createECSClient({
   rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/0rXVfxycbHEigHX96u1p-G02VKeV2AS5'
 })
 
-console.log('🔍 Testing ECS Query Examples')
+console.log('🧪 Testing ecsjs library')
 console.log('='.repeat(50))
 
 try {
-  const resolverAddress = '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e'
-  const credentialKey = 'eth.ecs.name-stars.starts:vitalik.eth'
-
-  // Get label from resolver address (for Hooks)
+  // Example 1: Get label from resolver address
   console.log('\n1. Get label from resolver address...')
+  const resolverAddress = '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e'
   const label = await getLabelByResolver(client, resolverAddress)
   console.log(`   ✅ Label: "${label}"`)
 
-  // Query credential using ecsjs
-  console.log('\n2. Query credential using ecsjs...')
-  console.log(`   Resolver: ${resolverAddress}`)
+  // Example 2: Resolve credential
+  console.log('\n2. Resolve credential...')
+  const credentialKey = 'eth.ecs.name-stars.starts:vitalik.eth'
+  const value = await resolveCredential(client, resolverAddress, credentialKey)
   console.log(`   Key: ${credentialKey}`)
-
-  const credential = await resolveCredential(client, resolverAddress, credentialKey)
-  console.log(`   ✅ Value: "${credential}"`)
+  console.log(`   ✅ Value: "${value}"`)
 
   console.log('\n' + '='.repeat(50))
-  console.log('✅ All queries successful!')
+  console.log('✅ All tests passed!')
   process.exit(0)
 } catch (error) {
   console.error('\n❌ Error:', error.message)

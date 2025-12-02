@@ -1,10 +1,9 @@
-import { createPublicClient, http } from 'viem'
-import { sepolia } from 'viem/chains'
+import { createECSClient, sepolia } from '../lib/ecsjs.js'
 
 // Create a client for Sepolia
-const client = createPublicClient({
+const client = createECSClient({
   chain: sepolia,
-  transport: http('https://eth-sepolia.g.alchemy.com/v2/0rXVfxycbHEigHX96u1p-G02VKeV2AS5')
+  rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/0rXVfxycbHEigHX96u1p-G02VKeV2AS5'
 })
 
 async function resolveTextRecord(name, key) {

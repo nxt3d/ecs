@@ -4,6 +4,15 @@
 
 ECS V2 is built to be fully compatible with the [ENS Hooks standard](https://github.com/nxt3d/ensips/blob/hooks/ensips/hooks.md), enabling ENS names to "jump" to these known resolvers to securely resolve onchain or offchain records.
 
+## Installation
+
+```bash
+npm install @nxt3d/ecsjs@^2.0.0
+```
+
+> **Important:** Ensure you install version `^2.0.0` or higher. V1 is deprecated and incompatible with ECS V2.  
+> **Note:** `@nxt3d/ecsjs` includes viem as a dependency, so you don't need to install it separately.
+
 ## Goals of V2
 
 *   **Simplicity:** The complex multi-level registry has been replaced with a flat, single-label registry. Labels (e.g., `optimism`) map directly to resolvers.
@@ -49,39 +58,29 @@ This creates a trusted link to the record, where `maria.eth` doesn't store the r
 ### Example: Resolving a Hook
 
 ```javascript
-import { createPublicClient, http } from 'viem'
-import { sepolia } from 'viem/chains'
+import { 
+  createECSClient, 
+  sepolia,
+  getLabelByResolver, 
+  resolveCredential 
+} from '@nxt3d/ecsjs'
 
-const client = createPublicClient({
+const client = createECSClient({
   chain: sepolia,
-  transport: http('https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY')
+  rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY'
 })
 
-// Step 1: User has hook pointing to resolver
+// User has hook pointing to resolver
 const resolverAddress = '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e'
 const credentialKey = 'eth.ecs.name-stars.starts:vitalik.eth'
 
-// Step 2: Get label from ECS Registry
-const label = await client.readContract({
-  address: '0x016BfbF42131004401ABdfe208F17A1620faB742', // ECS Registry
-  abi: [{
-    name: 'getLabelByResolver',
-    type: 'function',
-    inputs: [{ name: 'resolver_', type: 'address' }],
-    outputs: [{ name: '', type: 'string' }]
-  }],
-  functionName: 'getLabelByResolver',
-  args: [resolverAddress]
-})
-// Returns: "name-stars"
-
-// Step 3: Construct ENS name and query credential
-const ensName = `${label}.ecs.eth`
-const credential = await client.getEnsText({
-  name: ensName,
-  key: credentialKey
-})
+// Get label and resolve credential in one call
+const credential = await resolveCredential(client, resolverAddress, credentialKey)
 // Returns: "100"
+
+// Or get just the label
+const label = await getLabelByResolver(client, resolverAddress)
+// Returns: "name-stars"
 ```
 
 ## Deployments
@@ -135,39 +134,34 @@ cast call 0x016BfbF42131004401ABdfe208F17A1620faB742 \
 # Returns: "name-stars"
 ```
 
-**Using Viem:**
+**Using @nxt3d/ecsjs:**
 
 ```javascript
-import { createPublicClient, http } from 'viem'
-import { sepolia } from 'viem/chains'
+import { 
+  createECSClient, 
+  sepolia,
+  getLabelByResolver, 
+  resolveCredential 
+} from '@nxt3d/ecsjs'
 
-const client = createPublicClient({
+const client = createECSClient({
   chain: sepolia,
-  transport: http('https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY')
+  rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY'
 })
 
-// Get label from resolver address (for Hooks)
-const label = await client.readContract({
-  address: '0x016BfbF42131004401ABdfe208F17A1620faB742',
-  abi: [{
-    name: 'getLabelByResolver',
-    type: 'function',
-    inputs: [{ name: 'resolver_', type: 'address' }],
-    outputs: [{ name: '', type: 'string' }]
-  }],
-  functionName: 'getLabelByResolver',
-  args: ['0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e']
-})
+// Get label from resolver address
+const label = await getLabelByResolver(
+  client,
+  '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e'
+)
 // Returns: "name-stars"
 
-// Query credential using ENS methods
-const ensName = `${label}.ecs.eth`
-const credentialKey = 'eth.ecs.name-stars.starts:vitalik.eth'
-
-const credential = await client.getEnsText({
-  name: ensName,
-  key: credentialKey
-})
+// Or resolve credential directly
+const credential = await resolveCredential(
+  client,
+  '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e',
+  'eth.ecs.name-stars.starts:vitalik.eth'
+)
 // Returns: "100"
 ```
 
