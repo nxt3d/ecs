@@ -59,6 +59,7 @@ const client = createPublicClient({
 
 // Step 1: User has hook pointing to resolver
 const resolverAddress = '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e'
+const credentialKey = 'eth.ecs.name-stars.starts:vitalik.eth'
 
 // Step 2: Get label from ECS Registry
 const label = await client.readContract({
@@ -74,20 +75,11 @@ const label = await client.readContract({
 })
 // Returns: "name-stars"
 
-// Step 3: Query resolver for credential (node can be any value)
-const credential = await client.readContract({
-  address: resolverAddress,
-  abi: [{
-    name: 'text',
-    type: 'function',
-    inputs: [
-      { name: 'node', type: 'bytes32' },
-      { name: 'key', type: 'string' }
-    ],
-    outputs: [{ name: '', type: 'string' }]
-  }],
-  functionName: 'text',
-  args: ['0x0000000000000000000000000000000000000000000000000000000000000000', 'eth.ecs.name-stars.starts:vitalik.eth']
+// Step 3: Construct ENS name and query credential
+const ensName = `${label}.ecs.eth`
+const credential = await client.getEnsText({
+  name: ensName,
+  key: credentialKey
 })
 // Returns: "100"
 ```
