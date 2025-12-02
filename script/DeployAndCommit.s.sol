@@ -15,6 +15,10 @@ contract DeployAndCommit is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         
+        // Compute deployer address from private key
+        address deployerAddress = vm.addr(deployerPrivateKey);
+        console.log("Deployer address:", deployerAddress);
+        
         // Optional: Allow overriding ROOT_NAME, default to "ecs.eth"
         string memory rootName = vm.envOr("ROOT_NAME", string("ecs.eth"));
         
@@ -48,9 +52,10 @@ contract DeployAndCommit is Script {
         registrar.setPricingForAllLengths(prices);
         console.log("Set registrar pricing: ~0.001 ETH/year");
         
-        // 5. Deploy CredentialResolver
-        CredentialResolver credentialResolver = new CredentialResolver(msg.sender);
+        // 5. Deploy CredentialResolver with explicit deployer address
+        CredentialResolver credentialResolver = new CredentialResolver(deployerAddress);
         console.log("CredentialResolver deployed at:", address(credentialResolver));
+        console.log("CredentialResolver owner:", deployerAddress);
 
         // 6. Commit registration for 'name-stars'
         string memory subnameLabel = "name-stars";
