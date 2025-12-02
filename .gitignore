@@ -2,6 +2,8 @@
 out/
 cache/
 broadcast/
+**/build-info/*.json
+cache/*.json
 
 # Environment variables
 .env
