@@ -1,5 +1,8 @@
 # Ethereum Credential Service (ECS) V2
 
+**Version:** 0.2.0-beta  
+**Status:** Beta - Deployed on Sepolia
+
 **ECS V2** is a simplified, decentralized registry for "known" credential resolvers. Entities can register a unique namespace (e.g., `my-service.ecs.eth`) and point it to a standard ENS resolver that serves credential data.
 
 ECS V2 is built to be fully compatible with the [ENS Hooks standard](https://github.com/nxt3d/ensips/blob/hooks/ensips/hooks.md), enabling ENS names to "jump" to these known resolvers to securely resolve onchain or offchain records.
@@ -7,10 +10,10 @@ ECS V2 is built to be fully compatible with the [ENS Hooks standard](https://git
 ## Installation
 
 ```bash
-npm install @nxt3d/ecsjs@^2.0.0
+npm install @nxt3d/ecsjs@^0.2.0-beta
 ```
 
-> **Important:** Ensure you install version `^2.0.0` or higher. V1 is deprecated and incompatible with ECS V2.  
+> **Important:** This is version 0.2.0-beta of ECS V2. ECS V1 is deprecated and incompatible.  
 > **Note:** `@nxt3d/ecsjs` includes viem as a dependency, so you don't need to install it separately.
 
 ## Goals of V2
@@ -116,6 +119,7 @@ if (resolverAge < 90 * 24 * 60 * 60) { // 90 days for high security
 
 ### Sepolia Testnet
 
+**Version:** 0.2.0-beta  
 **Date:** December 5, 2025  
 **Network:** Sepolia (Chain ID: 11155111)  
 **Status:** ✅ Live and operational (Deployment 02)
