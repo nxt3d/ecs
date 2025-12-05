@@ -53,8 +53,8 @@ contract DeployAndCommit is Script {
         registrar.setPricingForAllLengths(prices);
         console.log("Set registrar pricing: ~0.001 ETH/year");
         
-        // 5. Deploy CredentialResolver implementation
-        CredentialResolver implementation = new CredentialResolver(address(0));
+        // 5. Deploy CredentialResolver implementation (deployer is owner, but it won't be used directly)
+        CredentialResolver implementation = new CredentialResolver(deployerAddress);
         console.log("CredentialResolver implementation deployed at:", address(implementation));
         
         // 6. Deploy CredentialResolverFactory

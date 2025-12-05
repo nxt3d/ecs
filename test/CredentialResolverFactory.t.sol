@@ -2,10 +2,13 @@
 pragma solidity ^0.8.27;
 
 import "forge-std/Test.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import "../src/CredentialResolverFactory.sol";
 import "../src/CredentialResolver.sol";
 
 contract CredentialResolverFactoryTest is Test {
+    using Clones for address;
+    
     /* --- Test Accounts --- */
     
     address factory = address(0x1001);
@@ -129,6 +132,37 @@ contract CredentialResolverFactoryTest is Test {
         
         // Clone should be significantly cheaper
         assertTrue(cloneGas < regularGas);
+    }
+    
+    function test_006____initialize_________________ImplementationIsAlreadyInitialized() public {
+        // Implementation should be already initialized (can't be initialized again)
+        vm.expectRevert(abi.encodeWithSignature("AlreadyInitialized()"));
+        implementation.initialize(user1);
+    }
+    
+    function test_007____initialize_________________CloneCanOnlyBeInitializedOnce() public {
+        // Create a clone using low-level clone
+        address clone = address(implementation).clone();
+        
+        // First initialization should succeed
+        CredentialResolver(clone).initialize(user1);
+        assertEq(CredentialResolver(clone).owner(), user1);
+        
+        // Second initialization should fail
+        vm.expectRevert(abi.encodeWithSignature("AlreadyInitialized()"));
+        CredentialResolver(clone).initialize(user2);
+    }
+    
+    function test_008____initialize_________________CannotInitializeWithZeroAddress() public {
+        // Deploy implementation with zero address should revert
+        vm.expectRevert(abi.encodeWithSignature("OwnableInvalidOwner(address)", address(0)));
+        new CredentialResolver(address(0));
+    }
+    
+    function test_009____initialize_________________FactoryCannotCreateResolverForZeroAddress() public {
+        // Factory should not allow creating resolver with zero address owner
+        vm.expectRevert(abi.encodeWithSignature("InvalidOwner()"));
+        resolverFactory.createResolver(address(0));
     }
 }
 

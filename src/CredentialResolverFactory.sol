@@ -21,6 +21,9 @@ contract CredentialResolverFactory {
 
     // Events
     event ResolverCloneDeployed(address indexed clone, address indexed owner);
+    
+    // Errors
+    error InvalidOwner();
 
     /**
      * @notice Constructor
@@ -36,6 +39,8 @@ contract CredentialResolverFactory {
      * @return clone The address of the deployed clone
      */
     function createResolver(address owner) external returns (address clone) {
+        if (owner == address(0)) revert InvalidOwner();
+        
         // Deploy minimal clone
         clone = implementation.clone();
         
@@ -58,6 +63,8 @@ contract CredentialResolverFactory {
      * @return clone The address of the deployed clone
      */
     function createResolverDeterministic(address owner, bytes32 salt) external returns (address clone) {
+        if (owner == address(0)) revert InvalidOwner();
+        
         // Deploy minimal clone with deterministic address
         clone = implementation.cloneDeterministic(salt);
         
