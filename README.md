@@ -47,7 +47,10 @@ Hooks enable ENS names to redirect queries to known resolvers.
     hook("text(bytes32,string)", <ECS_RESOLVER_ADDRESS>)
     ```
 2.  **Client** reads this record and extracts the `<ECS_RESOLVER_ADDRESS>`.
-3.  **Client** calls `getLabelByResolver(<ECS_RESOLVER_ADDRESS>)` on the ECS Registry to find its registered label (e.g., `my-service`).
+3.  **Client** calls `getResolverInfo(<ECS_RESOLVER_ADDRESS>)` on the ECS Registry to:
+    - Find its registered label (e.g., `my-service`)
+    - Check the `resolverUpdated` timestamp to verify resolver stability
+    - **Make a trust decision** based on how recently the resolver was changed
 4.  **Client** constructs the service name `my-service.ecs.eth` (optional, for provenance).
 5.  **Client** queries the resolver directly: `text(node, "credential-key")`.
     - Note: Single-label resolvers ignore the `node` parameter, so any value (including `0x0`) works.
@@ -61,7 +64,7 @@ This creates a trusted link to the record, where `maria.eth` doesn't store the r
 import { 
   createECSClient, 
   sepolia,
-  getLabelByResolver, 
+  getResolverInfo, 
   resolveCredential 
 } from '@nxt3d/ecsjs'
 
@@ -78,9 +81,9 @@ const credentialKey = 'eth.ecs.name-stars.starts:vitalik.eth'
 const credential = await resolveCredential(client, resolverAddress, credentialKey)
 // Returns: "100"
 
-// Or get just the label
-const label = await getLabelByResolver(client, resolverAddress)
-// Returns: "name-stars"
+// Or get resolver info
+const { label, resolverUpdated } = await getResolverInfo(client, resolverAddress)
+// Returns: { label: "name-stars", resolverUpdated: 1234567890n }
 
 // You can also use viem's ENS functions directly
 const ensName = `${label}.ecs.eth`
@@ -90,6 +93,24 @@ const textValue = await client.getEnsText({
 })
 // Returns: "100"
 ```
+
+## Resolver Trust and Freshness
+
+**ECS strictly enforces a one-to-one relationship between labels and resolvers.** While label owners can change resolvers (necessary for upgrades), this introduces a security concern. The registry tracks `resolverUpdated` timestamps, allowing clients to enforce security policies based on resolver age.
+
+**Security-conscious clients can require resolvers to be established (e.g., 90+ days old) before trusting them.** Recent resolver changes may indicate compromise, untested deployments, or migrations requiring review.
+
+```javascript
+const { label, resolverUpdated } = await getResolverInfo(client, resolverAddress)
+const resolverAge = Math.floor(Date.now() / 1000) - Number(resolverUpdated)
+
+if (resolverAge < 90 * 24 * 60 * 60) { // 90 days for high security
+  console.warn(`⚠️ Resolver for "${label}" changed ${Math.floor(resolverAge / 86400)} days ago`)
+  // Reject or require security review
+}
+```
+
+**Planned Upgrades:** Resolvers can announce upcoming upgrades via the [`resolver-info` text record](https://github.com/nxt3d/ensips/blob/resolver-info-metadata/ensips/resolver-info-text-record.md), including the bytecode hash of the new implementation. Clients can whitelist this hash to maintain continuous resolution even when the resolver upgrades, verifying the upgrade follows the expected path.
 
 ## Deployments
 
@@ -136,10 +157,10 @@ const textValue = await client.getEnsText({
 ```bash
 # Get label from resolver address (for Hooks)
 cast call 0x016BfbF42131004401ABdfe208F17A1620faB742 \
-  "getLabelByResolver(address)(string)" \
+  "getResolverInfo(address)(string,uint128)" \
   0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e \
   --rpc-url https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
-# Returns: "name-stars"
+# Returns: "name-stars", 1733184000
 ```
 
 **Using @nxt3d/ecsjs:**
@@ -148,7 +169,7 @@ cast call 0x016BfbF42131004401ABdfe208F17A1620faB742 \
 import { 
   createECSClient, 
   sepolia,
-  getLabelByResolver, 
+  getResolverInfo, 
   resolveCredential 
 } from '@nxt3d/ecsjs'
 
@@ -157,12 +178,12 @@ const client = createECSClient({
   rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY'
 })
 
-// Get label from resolver address
-const label = await getLabelByResolver(
+// Get resolver info from resolver address
+const { label, resolverUpdated } = await getResolverInfo(
   client,
   '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e'
 )
-// Returns: "name-stars"
+// Returns: { label: "name-stars", resolverUpdated: 1733184000n }
 
 // Or resolve credential directly
 const credential = await resolveCredential(

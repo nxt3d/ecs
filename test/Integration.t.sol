@@ -124,7 +124,6 @@ contract IntegrationTest is Test {
         // This matches `providerNode`.
         
         // Provider sets the text record on their resolver (owner only, single-label resolver)
-        vm.prank(provider);
         providerResolver.setText(credentialKey, starCount);
         
         vm.stopPrank();
@@ -140,6 +139,11 @@ contract IntegrationTest is Test {
         string memory resolvedValue = ITextResolver(resolvedResolver).text(providerNode, credentialKey);
         assertEq(resolvedValue, "5");
         
+        // Verify getResolverInfo
+        (string memory label, uint128 updated) = registry.getResolverInfo(address(providerResolver));
+        assertEq(label, PROVIDER_LABEL);
+        assertTrue(updated > 0);
+
         vm.stopPrank();
     }
     
@@ -153,7 +157,6 @@ contract IntegrationTest is Test {
         
         // Provider updates stars to 10
         vm.startPrank(provider);
-        vm.prank(provider);
         providerResolver.setText(credentialKey, "10");
         vm.stopPrank();
         

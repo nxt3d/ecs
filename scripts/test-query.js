@@ -1,7 +1,7 @@
 import { 
   createECSClient, 
   sepolia,
-  getLabelByResolver, 
+  getResolverInfo, 
   resolveCredential 
 } from '../lib/ecsjs.js'
 
@@ -19,8 +19,9 @@ try {
 
   // Get label from resolver address (for Hooks)
   console.log('\n1. Get label from resolver address...')
-  const label = await getLabelByResolver(client, resolverAddress)
+  const { label, resolverUpdated } = await getResolverInfo(client, resolverAddress)
   console.log(`   ✅ Label: "${label}"`)
+  console.log(`   ✅ Updated: ${resolverUpdated}`)
 
   // Query credential using ecsjs
   console.log('\n2. Query credential using ecsjs...')

@@ -70,7 +70,8 @@ contract ECSRegistry is ERC165, AccessControl {
     struct Record {
         address owner;
         string label; // Store the original human-readable label
-        uint256 expiration; // Expiration timestamp for the name
+        uint128 expiration; // Expiration timestamp for the name
+        uint128 resolverUpdated; // Timestamp of last resolver update
     }
 
     mapping(bytes32 labelhash => Record record) records;
@@ -145,7 +146,8 @@ contract ECSRegistry is ERC165, AccessControl {
         
         // Set owner and expiration
         records[labelhash].owner = newOwner;
-        records[labelhash].expiration = expiration;
+        records[labelhash].expiration = uint128(expiration);
+        records[labelhash].resolverUpdated = uint128(block.timestamp);
         
         // Set resolver with unique check
         _updateResolver(labelhash, resolver_);
@@ -255,6 +257,7 @@ contract ECSRegistry is ERC165, AccessControl {
                 ens.setSubnodeRecord(rootNode, labelhash, address(this), newResolver, 0);
             }
             
+            records[labelhash].resolverUpdated = uint128(block.timestamp);
             emit ResolverChanged(labelhash, newResolver);
         }
     }
@@ -301,16 +304,17 @@ contract ECSRegistry is ERC165, AccessControl {
     }
 
     /**
-     * @dev Returns the label string associated with a resolver address
+     * @dev Returns the label string and last resolver update timestamp associated with a resolver address
      * @param resolver_ The resolver address to look up
-     * @return string The human-readable label
+     * @return label The human-readable label
+     * @return resolverUpdated The timestamp of the last resolver update
      */
-    function getLabelByResolver(address resolver_) external view returns (string memory) {
+    function getResolverInfo(address resolver_) external view returns (string memory label, uint128 resolverUpdated) {
         bytes32 labelhash = resolverToLabelhash[resolver_];
         if (labelhash == bytes32(0)) {
-            return "";
+            return ("", 0);
         }
-        return records[labelhash].label;
+        return (records[labelhash].label, records[labelhash].resolverUpdated);
     }
 
     /**
@@ -326,7 +330,7 @@ contract ECSRegistry is ERC165, AccessControl {
             CannotReduceExpirationTime(records[labelhash].expiration, newExpiration)
         );
         
-        records[labelhash].expiration = newExpiration;
+        records[labelhash].expiration = uint128(newExpiration);
         emit ExpirationExtended(labelhash, newExpiration);
     }
 

@@ -1,7 +1,7 @@
 import { 
   createECSClient, 
   sepolia,
-  getLabelByResolver, 
+  getResolverInfo, 
   resolveCredential 
 } from '../lib/ecsjs.js'
 
@@ -19,8 +19,9 @@ async function resolveViaHook(resolverAddress, credentialKey) {
   
   // Step 1: Get label from ECS Registry using ecsjs
   console.log('Step 1: Query ECS Registry for label...')
-  const label = await getLabelByResolver(client, resolverAddress)
+  const { label, resolverUpdated } = await getResolverInfo(client, resolverAddress)
   console.log(`   ✅ Label: "${label}"`)
+  console.log(`   ✅ Updated: ${resolverUpdated}`)
   
   // Step 2: Construct full ENS name
   const fullName = `${label}.ecs.eth`

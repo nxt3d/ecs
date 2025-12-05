@@ -241,6 +241,11 @@ contract ECSRegistryTest is Test {
         vm.stopPrank();
         
         assertEq(registry.resolver(labelhash), newResolver);
+
+        // Check resolverUpdated
+        (string memory label, uint128 updated) = registry.getResolverInfo(newResolver);
+        assertEq(label, LABEL);
+        assertEq(updated, block.timestamp);
     }
     
     /* --- Expiration Tests --- */
@@ -378,13 +383,20 @@ contract ECSRegistryTest is Test {
         );
         registry.setRecord(labelhash2, newOwner, resolver, secret);
     }
-    function test_016____getLabelByResolver________________ReturnsCorrectLabel() public {
+    function test_016____getResolverInfo________________ReturnsCorrectLabelAndTimestamp() public {
         uint256 expires = block.timestamp + DURATION;
         vm.prank(registrar);
         registry.setLabelhashRecord(LABEL, user1, resolver, expires);
         
-        assertEq(registry.getLabelByResolver(resolver), LABEL);
-        assertEq(registry.getLabelByResolver(address(0xdeadbeef)), "");
+        // Initially set at block.timestamp
+        (string memory label, uint128 updated) = registry.getResolverInfo(resolver);
+        assertEq(label, LABEL);
+        // In setLabelhashRecord, _updateResolver is called, which sets resolverUpdated to block.timestamp
+        assertEq(updated, block.timestamp);
+
+        (string memory labelEmpty, uint128 updatedEmpty) = registry.getResolverInfo(address(0xdeadbeef));
+        assertEq(labelEmpty, "");
+        assertEq(updatedEmpty, 0);
     }
 }
 
