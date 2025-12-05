@@ -28,6 +28,9 @@ contract CredentialResolver is Ownable, IERC165, IExtendedResolver {
     bytes private contenthashRecord;
     mapping(string key => string value) private textRecords;
     mapping(string key => bytes data) private dataRecords;
+    
+    // Clone initialization tracking
+    bool private initialized;
 
     // Events
     event AddrChanged(address a);
@@ -36,11 +39,27 @@ contract CredentialResolver is Ownable, IERC165, IExtendedResolver {
     event TextChanged(string indexed key, string value);
     event DataChanged(string indexed key, bytes data);
 
+    // Errors
+    error AlreadyInitialized();
+
     /**
      * @notice Constructor
+     * @param _owner The address to set as the owner (for non-clone deployments)
+     */
+    constructor(address _owner) Ownable(_owner) {
+        // Mark as initialized for the implementation
+        initialized = true;
+    }
+
+    /**
+     * @notice Initialize a cloned resolver (only callable once per clone)
      * @param _owner The address to set as the owner
      */
-    constructor(address _owner) Ownable(_owner) {}
+    function initialize(address _owner) external {
+        if (initialized) revert AlreadyInitialized();
+        initialized = true;
+        _transferOwnership(_owner);
+    }
 
     /**
      * @notice Resolve data for a DNS-encoded name using ENSIP-10 interface.

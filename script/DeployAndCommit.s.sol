@@ -5,6 +5,7 @@ import "forge-std/Script.sol";
 import "../src/ECSRegistry.sol";
 import "../src/ECSRegistrar.sol";
 import "../src/CredentialResolver.sol";
+import "../src/CredentialResolverFactory.sol";
 import "../src/ENS.sol";
 import "../src/utils/NameCoder.sol";
 
@@ -52,12 +53,20 @@ contract DeployAndCommit is Script {
         registrar.setPricingForAllLengths(prices);
         console.log("Set registrar pricing: ~0.001 ETH/year");
         
-        // 5. Deploy CredentialResolver with explicit deployer address
-        CredentialResolver credentialResolver = new CredentialResolver(deployerAddress);
-        console.log("CredentialResolver deployed at:", address(credentialResolver));
+        // 5. Deploy CredentialResolver implementation
+        CredentialResolver implementation = new CredentialResolver(address(0));
+        console.log("CredentialResolver implementation deployed at:", address(implementation));
+        
+        // 6. Deploy CredentialResolverFactory
+        CredentialResolverFactory resolverFactory = new CredentialResolverFactory(address(implementation));
+        console.log("CredentialResolverFactory deployed at:", address(resolverFactory));
+        
+        // 7. Deploy a clone for this registration
+        CredentialResolver credentialResolver = CredentialResolver(resolverFactory.createResolver(deployerAddress));
+        console.log("CredentialResolver clone deployed at:", address(credentialResolver));
         console.log("CredentialResolver owner:", deployerAddress);
 
-        // 6. Commit registration for 'name-stars'
+        // 8. Commit registration for 'name-stars'
         string memory subnameLabel = "name-stars";
         uint256 duration = 365 days;
         bytes32 secret = keccak256(abi.encodePacked("test-secret-", block.timestamp));
@@ -83,7 +92,9 @@ contract DeployAndCommit is Script {
         console.log("Root Node:", vm.toString(rootNode));
         console.log("ECS Registry:", address(registry));
         console.log("ECS Registrar:", address(registrar));
-        console.log("Credential Resolver:", address(credentialResolver));
+        console.log("Resolver Factory:", address(resolverFactory));
+        console.log("Resolver Implementation:", address(implementation));
+        console.log("Credential Resolver (clone):", address(credentialResolver));
         console.log("--------------------------------------------------");
         console.log("Commitment Details:");
         console.log("  Label:", subnameLabel);
