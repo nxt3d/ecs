@@ -10,7 +10,7 @@
     "test": "node scripts/test-query.js"
   },
   "dependencies": {
-    "@nxt3d/ecsjs": "^0.2.1-beta",
+    "@nxt3d/ecsjs": "^0.2.2-beta",
     "viem": "^2.21.54"
   },
   "keywords": [
