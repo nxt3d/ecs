@@ -16,7 +16,7 @@ console.log('='.repeat(50))
 try {
   // Example 1: Get label from resolver address
   console.log('\n1. Get label from resolver address...')
-  const resolverAddress = '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e'
+  const resolverAddress = '0xB5D67A9bEf2052cC600f391A3997D46854cabC22'
   const { label, resolverUpdated } = await getResolverInfo(client, resolverAddress)
   console.log(`   ✅ Label: "${label}"`)
   console.log(`   ✅ Updated: ${resolverUpdated}`)

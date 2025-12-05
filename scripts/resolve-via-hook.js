@@ -65,8 +65,8 @@ async function resolveViaHook(resolverAddress, credentialKey) {
 }
 
 // Example: User has a Hook pointing to this resolver
-// hook("text(bytes32,string)", 0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e)
-const resolverAddress = '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e'
+// hook("text(bytes32,string)", 0xB5D67A9bEf2052cC600f391A3997D46854cabC22)
+const resolverAddress = '0xB5D67A9bEf2052cC600f391A3997D46854cabC22'
 const credentialKey = 'eth.ecs.name-stars.starts:vitalik.eth'
 
 resolveViaHook(resolverAddress, credentialKey)

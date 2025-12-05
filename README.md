@@ -116,17 +116,17 @@ if (resolverAge < 90 * 24 * 60 * 60) { // 90 days for high security
 
 ### Sepolia Testnet
 
-**Date:** December 2, 2025  
+**Date:** December 5, 2025  
 **Network:** Sepolia (Chain ID: 11155111)  
-**Status:** ✅ Live and operational
+**Status:** ✅ Live and operational (Deployment 02)
 
 #### Deployed Contracts
 
-| Contract | Address |
-|----------|---------|
-| ECS Registry | `0x016BfbF42131004401ABdfe208F17A1620faB742` |
-| ECS Registrar | `0x7aDf2626E846aC3a36ac72f25B8329C893b45e12` |
-| Credential Resolver (name-stars) | `0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e` |
+| Contract | Address | Verified |
+|----------|---------|----------|
+| ECS Registry | `0x2bA1277bD3f5638F605696cb974eD67Ef81767Ec` | [✅ View](https://sepolia.etherscan.io/address/0x2bA1277bD3f5638F605696cb974eD67Ef81767Ec) |
+| ECS Registrar | `0x47C680d3720dDc23250cF697466582829a0533Ce` | [✅ View](https://sepolia.etherscan.io/address/0x47C680d3720dDc23250cF697466582829a0533Ce) |
+| Credential Resolver (name-stars) | `0xB5D67A9bEf2052cC600f391A3997D46854cabC22` | [✅ View](https://sepolia.etherscan.io/address/0xB5D67A9bEf2052cC600f391A3997D46854cabC22) |
 
 #### Configuration
 
@@ -142,8 +142,8 @@ if (resolverAge < 90 * 24 * 60 * 60) { // 90 days for high security
 
 - **Status:** ✅ Registered
 - **Owner:** `0xF8e03bd4436371E0e2F7C02E529b2172fe72b4EF`
-- **Resolver:** `0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e`
-- **Expires:** December 2, 2026
+- **Resolver:** `0xB5D67A9bEf2052cC600f391A3997D46854cabC22`
+- **Expires:** December 5, 2026
 
 **Credential Records:**
 - **Key:** `eth.ecs.name-stars.starts:vitalik.eth`
@@ -156,11 +156,11 @@ if (resolverAge < 90 * 24 * 60 * 60) { // 90 days for high security
 
 ```bash
 # Get label from resolver address (for Hooks)
-cast call 0x016BfbF42131004401ABdfe208F17A1620faB742 \
+cast call 0x2bA1277bD3f5638F605696cb974eD67Ef81767Ec \
   "getResolverInfo(address)(string,uint128)" \
-  0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e \
+  0xB5D67A9bEf2052cC600f391A3997D46854cabC22 \
   --rpc-url https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
-# Returns: "name-stars", 1733184000
+# Returns: "name-stars", 1764948384
 ```
 
 **Using @nxt3d/ecsjs:**
@@ -181,14 +181,14 @@ const client = createECSClient({
 // Get resolver info from resolver address
 const { label, resolverUpdated } = await getResolverInfo(
   client,
-  '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e'
+  '0xB5D67A9bEf2052cC600f391A3997D46854cabC22'
 )
-// Returns: { label: "name-stars", resolverUpdated: 1733184000n }
+// Returns: { label: "name-stars", resolverUpdated: 1764948384n }
 
 // Or resolve credential directly
 const credential = await resolveCredential(
   client,
-  '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e',
+  '0xB5D67A9bEf2052cC600f391A3997D46854cabC22',
   'eth.ecs.name-stars.starts:vitalik.eth'
 )
 // Returns: "100"
@@ -201,7 +201,7 @@ npm run hook  # Full Hooks resolution flow
 npm run resolve  # Direct text record resolution
 ```
 
-For full deployment details, see `deployments/sepolia-2025-12-02-03.md`
+For full deployment details, see `deployments/sepolia-2025-12-05-02.md`
 
 ## Getting Started
 
@@ -223,4 +223,4 @@ See deployment scripts in `script/`:
 - `DeployAndCommit.s.sol` - Deploy contracts and commit registration
 - `RegisterAndSetup.s.sol` - Complete registration after 60s wait
 
-For full deployment details, see `deployments/sepolia-2025-12-02-03.md`
+For full deployment details, see `deployments/sepolia-2025-12-05-02.md`

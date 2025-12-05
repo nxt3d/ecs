@@ -14,7 +14,7 @@ console.log('🔍 Testing ECS Query Examples')
 console.log('='.repeat(50))
 
 try {
-  const resolverAddress = '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e'
+  const resolverAddress = '0xB5D67A9bEf2052cC600f391A3997D46854cabC22'
   const credentialKey = 'eth.ecs.name-stars.starts:vitalik.eth'
 
   // Get label from resolver address (for Hooks)

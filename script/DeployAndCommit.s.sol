@@ -94,7 +94,9 @@ contract DeployAndCommit is Script {
         console.log("NEXT STEPS:");
         console.log("1. WAIT AT LEAST 60 SECONDS");
         console.log("2. Run RegisterAndSetup.s.sol with the same SECRET");
-        console.log("3. Set manager of '%s' to ECSRegistry (%s) in ENS (via ENS app)", rootName, address(registry));
+        console.log("3. Update the Manager of ENS name '%s' to the new ECSRegistry:", rootName);
+        console.log("   Manager Address: %s", address(registry));
+        console.log("   (Use ENS app at app.ens.domains)");
         console.log("--------------------------------------------------");
     }
 }
