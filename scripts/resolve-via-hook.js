@@ -28,20 +28,7 @@ async function resolveViaHook(resolverAddress, credentialKey) {
   console.log(`\nStep 2: Construct full ENS name...`)
   console.log(`   ✅ Full name: ${fullName}`)
   
-  // Step 3: Verify resolver in ENS Registry
-  console.log(`\nStep 3: Verify resolver in ENS Registry...`)
-  const ensResolver = await client.getEnsResolver({ name: fullName })
-  const ensResolverAddress = ensResolver?.address || '0x0000000000000000000000000000000000000000'
-  console.log(`   ✅ ENS Resolver: ${ensResolverAddress}`)
-  
-  if (ensResolverAddress.toLowerCase() !== resolverAddress.toLowerCase()) {
-    console.log(`   ⚠️  Warning: Resolver mismatch!`)
-    console.log(`      Expected: ${resolverAddress}`)
-    console.log(`      Found: ${ensResolverAddress}`)
-  }
-  
-  // Step 4: Query text record using ENS method
-  console.log(`\nStep 4: Query credential using ecsjs...`)
+  console.log(`\nStep 3: Query credential using ecsjs...`)
   const textValue = await resolveCredential(client, resolverAddress, credentialKey)
   console.log(`   ✅ Text Record Value: "${textValue}"`)
   
@@ -65,8 +52,8 @@ async function resolveViaHook(resolverAddress, credentialKey) {
 }
 
 // Example: User has a Hook pointing to this resolver
-// hook("text(bytes32,string)", 0xB5D67A9bEf2052cC600f391A3997D46854cabC22)
-const resolverAddress = '0xB5D67A9bEf2052cC600f391A3997D46854cabC22'
+// hook("text(bytes32,string)", 0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa)
+const resolverAddress = '0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa'
 const credentialKey = 'eth.ecs.name-stars.starts:vitalik.eth'
 
 resolveViaHook(resolverAddress, credentialKey)

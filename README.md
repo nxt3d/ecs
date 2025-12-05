@@ -10,10 +10,10 @@ ECS V2 is built to be fully compatible with the [ENS Hooks standard](https://git
 ## Installation
 
 ```bash
-npm install @nxt3d/ecsjs@0.2.0-beta
+npm install @nxt3d/ecsjs@0.2.1-beta
 ```
 
-> **Version:** 0.2.0-beta - [View on NPM](https://www.npmjs.com/package/@nxt3d/ecsjs)  
+> **Version:** 0.2.1-beta - [View on NPM](https://www.npmjs.com/package/@nxt3d/ecsjs)  
 > **Important:** ECS V1 is deprecated and incompatible with V2.  
 > **Note:** This package includes viem as a dependency, so you don't need to install it separately.
 
@@ -151,7 +151,7 @@ if (resolverAge < 90 * 24 * 60 * 60) { // 90 days for high security
 
 - **Status:** ✅ Registered
 - **Owner:** `0xF8e03bd4436371E0e2F7C02E529b2172fe72b4EF`
-- **Resolver:** `0xB5D67A9bEf2052cC600f391A3997D46854cabC22`
+- **Resolver:** `0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa` (minimal clone)
 - **Expires:** December 5, 2026
 
 **Credential Records:**
@@ -165,11 +165,11 @@ if (resolverAge < 90 * 24 * 60 * 60) { // 90 days for high security
 
 ```bash
 # Get label from resolver address (for Hooks)
-cast call 0x2bA1277bD3f5638F605696cb974eD67Ef81767Ec \
+cast call 0x4f2F0e7b61d9Bd0e30F186D6530Efc92429Fcc77 \
   "getResolverInfo(address)(string,uint128)" \
-  0xB5D67A9bEf2052cC600f391A3997D46854cabC22 \
+  0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa \
   --rpc-url https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
-# Returns: "name-stars", 1764948384
+# Returns: "name-stars", <timestamp>
 ```
 
 **Using @nxt3d/ecsjs:**
@@ -190,14 +190,14 @@ const client = createECSClient({
 // Get resolver info from resolver address
 const { label, resolverUpdated } = await getResolverInfo(
   client,
-  '0xB5D67A9bEf2052cC600f391A3997D46854cabC22'
+  '0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa'
 )
-// Returns: { label: "name-stars", resolverUpdated: 1764948384n }
+// Returns: { label: "name-stars", resolverUpdated: <timestamp>n }
 
 // Or resolve credential directly
 const credential = await resolveCredential(
   client,
-  '0xB5D67A9bEf2052cC600f391A3997D46854cabC22',
+  '0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa',
   'eth.ecs.name-stars.starts:vitalik.eth'
 )
 // Returns: "100"
