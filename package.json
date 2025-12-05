@@ -1,21 +1,16 @@
 {
-  "name": "@nxt3d/ecsjs",
+  "name": "ecs-contracts",
   "version": "0.2.0-beta",
   "type": "module",
-  "description": "Ethereum Credential Service V2 JavaScript Library",
-  "main": "lib/ecsjs.js",
-  "exports": {
-    ".": "./lib/ecsjs.js"
-  },
+  "description": "Ethereum Credential Service V2 - Smart Contracts and Scripts",
+  "private": true,
   "scripts": {
     "resolve": "node scripts/resolve-text-record.js",
     "hook": "node scripts/resolve-via-hook.js",
     "test": "node scripts/test-query.js"
   },
-  "peerDependencies": {
-    "viem": "^2.x"
-  },
   "dependencies": {
+    "@nxt3d/ecsjs": "^0.2.0-beta",
     "viem": "^2.21.54"
   },
   "keywords": [
@@ -31,6 +26,8 @@
     "url": "https://github.com/nxt3d/ecs.git",
     "directory": "."
   },
+  "author": "@nxt3d",
+  "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
   }

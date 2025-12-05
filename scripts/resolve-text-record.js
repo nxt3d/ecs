@@ -1,4 +1,4 @@
-import { createECSClient, sepolia } from '../lib/ecsjs.js'
+import { createECSClient, sepolia } from '@nxt3d/ecsjs'
 
 // Create a client for Sepolia
 const client = createECSClient({

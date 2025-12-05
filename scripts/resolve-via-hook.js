@@ -3,7 +3,7 @@ import {
   sepolia,
   getResolverInfo, 
   resolveCredential 
-} from '../lib/ecsjs.js'
+} from '@nxt3d/ecsjs'
 
 // Create a client for Sepolia
 const client = createECSClient({

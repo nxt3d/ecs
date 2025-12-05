@@ -10,11 +10,12 @@ ECS V2 is built to be fully compatible with the [ENS Hooks standard](https://git
 ## Installation
 
 ```bash
-npm install @nxt3d/ecsjs@^0.2.0-beta
+npm install @nxt3d/ecsjs@0.2.0-beta
 ```
 
-> **Important:** This is version 0.2.0-beta of ECS V2. ECS V1 is deprecated and incompatible.  
-> **Note:** `@nxt3d/ecsjs` includes viem as a dependency, so you don't need to install it separately.
+> **Version:** 0.2.0-beta - [View on NPM](https://www.npmjs.com/package/@nxt3d/ecsjs)  
+> **Important:** ECS V1 is deprecated and incompatible with V2.  
+> **Note:** This package includes viem as a dependency, so you don't need to install it separately.
 
 ## Goals of V2
 
