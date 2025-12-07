@@ -401,5 +401,46 @@ contract ECSRegistryTest is Test {
         assertEq(updatedEmpty, 0);
         assertEq(reviewEmpty, "");
     }
+    
+    function test_017____setResolverReview__________AdminCanSetReview() public {
+        // Setup: Register a label with a resolver
+        uint256 expires = block.timestamp + DURATION;
+        vm.prank(registrar);
+        registry.setLabelhashRecord(LABEL, user1, resolver, expires);
+        
+        // Admin sets a review
+        string memory reviewText = "Status: Verified, Audit Score: 85/100, Date: 2025-04-21";
+        vm.prank(admin);
+        vm.expectEmit(true, false, false, true);
+        emit ECSRegistry.ResolverReviewUpdated(labelhash, reviewText);
+        registry.setResolverReview(resolver, reviewText);
+        
+        // Verify the review is returned correctly
+        (string memory label, uint128 updated, string memory review) = registry.getResolverInfo(resolver);
+        assertEq(label, LABEL);
+        assertEq(updated, block.timestamp); // Updated when registered
+        assertEq(review, reviewText);
+    }
+    
+    function test_018____setResolverReview__________NonAdminCannotSetReview() public {
+        // Setup: Register a label with a resolver
+        uint256 expires = block.timestamp + DURATION;
+        vm.prank(registrar);
+        registry.setLabelhashRecord(LABEL, user1, resolver, expires);
+        
+        // Non-admin tries to set review
+        vm.startPrank(user1);
+        bytes4 selector = bytes4(keccak256("AccessControlUnauthorizedAccount(address,bytes32)"));
+        vm.expectRevert(abi.encodeWithSelector(selector, user1, registry.ADMIN_ROLE()));
+        registry.setResolverReview(resolver, "Unauthorized review");
+        vm.stopPrank();
+    }
+    
+    function test_019____setResolverReview__________CannotSetReviewForUnregisteredResolver() public {
+        // Try to set review for a resolver that doesn't exist
+        vm.prank(admin);
+        vm.expectRevert("Resolver not registered");
+        registry.setResolverReview(address(0xdeadbeef), "Invalid review");
+    }
 }
 
