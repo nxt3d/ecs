@@ -243,9 +243,10 @@ contract ECSRegistryTest is Test {
         assertEq(registry.resolver(labelhash), newResolver);
 
         // Check resolverUpdated
-        (string memory label, uint128 updated) = registry.getResolverInfo(newResolver);
+        (string memory label, uint128 updated, string memory review) = registry.getResolverInfo(newResolver);
         assertEq(label, LABEL);
         assertEq(updated, block.timestamp);
+        assertEq(review, "");
     }
     
     /* --- Expiration Tests --- */
@@ -389,14 +390,16 @@ contract ECSRegistryTest is Test {
         registry.setLabelhashRecord(LABEL, user1, resolver, expires);
         
         // Initially set at block.timestamp
-        (string memory label, uint128 updated) = registry.getResolverInfo(resolver);
+        (string memory label, uint128 updated, string memory review) = registry.getResolverInfo(resolver);
         assertEq(label, LABEL);
         // In setLabelhashRecord, _updateResolver is called, which sets resolverUpdated to block.timestamp
         assertEq(updated, block.timestamp);
+        assertEq(review, "");
 
-        (string memory labelEmpty, uint128 updatedEmpty) = registry.getResolverInfo(address(0xdeadbeef));
+        (string memory labelEmpty, uint128 updatedEmpty, string memory reviewEmpty) = registry.getResolverInfo(address(0xdeadbeef));
         assertEq(labelEmpty, "");
         assertEq(updatedEmpty, 0);
+        assertEq(reviewEmpty, "");
     }
 }
 

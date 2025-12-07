@@ -44,6 +44,7 @@ contract ECSRegistry is ERC165, AccessControl {
     
     // Profile Events
     event ResolverChanged(bytes32 indexed labelhash, address resolver);
+    event ResolverReviewUpdated(bytes32 indexed labelhash, string review);
     
     // Lock Events
     event labelhashRentalSet(bytes32 indexed labelhash, uint256 expiration);
@@ -72,6 +73,7 @@ contract ECSRegistry is ERC165, AccessControl {
         string label; // Store the original human-readable label
         uint128 expiration; // Expiration timestamp for the name
         uint128 resolverUpdated; // Timestamp of last resolver update
+        string review; // Review string for the resolver (admin only)
     }
 
     mapping(bytes32 labelhash => Record record) records;
@@ -304,17 +306,31 @@ contract ECSRegistry is ERC165, AccessControl {
     }
 
     /**
-     * @dev Returns the label string and last resolver update timestamp associated with a resolver address
+     * @dev Returns the label string, last resolver update timestamp, and admin review associated with a resolver address
      * @param resolver_ The resolver address to look up
      * @return label The human-readable label
      * @return resolverUpdated The timestamp of the last resolver update
+     * @return review The admin review string
      */
-    function getResolverInfo(address resolver_) external view returns (string memory label, uint128 resolverUpdated) {
+    function getResolverInfo(address resolver_) external view returns (string memory label, uint128 resolverUpdated, string memory review) {
         bytes32 labelhash = resolverToLabelhash[resolver_];
         if (labelhash == bytes32(0)) {
-            return ("", 0);
+            return ("", 0, "");
         }
-        return (records[labelhash].label, records[labelhash].resolverUpdated);
+        return (records[labelhash].label, records[labelhash].resolverUpdated, records[labelhash].review);
+    }
+
+    /**
+     * @dev Sets the review string for a resolver (admin only)
+     * @param resolver_ The resolver address to review
+     * @param review The review string
+     */
+    function setResolverReview(address resolver_, string calldata review) external onlyRole(ADMIN_ROLE) {
+        bytes32 labelhash = resolverToLabelhash[resolver_];
+        require(labelhash != bytes32(0), "Resolver not registered");
+        
+        records[labelhash].review = review;
+        emit ResolverReviewUpdated(labelhash, review);
     }
 
     /**

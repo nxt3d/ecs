@@ -140,9 +140,10 @@ contract IntegrationTest is Test {
         assertEq(resolvedValue, "5");
         
         // Verify getResolverInfo
-        (string memory label, uint128 updated) = registry.getResolverInfo(address(providerResolver));
+        (string memory label, uint128 updated, string memory review) = registry.getResolverInfo(address(providerResolver));
         assertEq(label, PROVIDER_LABEL);
         assertTrue(updated > 0);
+        assertEq(review, "");
 
         vm.stopPrank();
     }
