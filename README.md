@@ -1,6 +1,6 @@
 # Ethereum Credential Service (ECS) V2
 
-**Version:** 0.2.0-beta  
+**Version:** 0.2.1-beta  
 **Status:** Beta - Deployed on Sepolia
 
 **ECS V2** is a simplified, decentralized registry for "known" credential resolvers. Entities can register a unique namespace (e.g., `my-service.ecs.eth`) and point it to a standard ENS resolver that serves credential data.
@@ -54,7 +54,8 @@ Hooks enable ENS names to redirect queries to known resolvers.
 3.  **Client** calls `getResolverInfo(<ECS_RESOLVER_ADDRESS>)` on the ECS Registry to:
     - Find its registered label (e.g., `my-service`)
     - Check the `resolverUpdated` timestamp to verify resolver stability
-    - **Make a trust decision** based on how recently the resolver was changed
+    - Read the `review` field for admin-assigned ratings or certifications
+    - **Make a trust decision** based on resolver age and review status
 4.  **Client** constructs the service name `my-service.ecs.eth` (optional, for provenance).
 5.  **Client** queries the resolver directly: `text(node, "credential-key")`.
     - Note: Single-label resolvers ignore the `node` parameter, so any value (including `0x0`) works.
@@ -86,8 +87,8 @@ const credential = await resolveCredential(client, resolverAddress, credentialKe
 // Returns: "100"
 
 // Or get resolver info
-const { label, resolverUpdated } = await getResolverInfo(client, resolverAddress)
-// Returns: { label: "name-stars", resolverUpdated: 1234567890n }
+const { label, resolverUpdated, review } = await getResolverInfo(client, resolverAddress)
+// Returns: { label: "name-stars", resolverUpdated: 1234567890n, review: "" }
 
 // You can also use viem's ENS functions directly
 const ensName = `${label}.ecs.eth`
@@ -105,14 +106,29 @@ const textValue = await client.getEnsText({
 **Security-conscious clients can require resolvers to be established (e.g., 90+ days old) before trusting them.** Recent resolver changes may indicate compromise, untested deployments, or migrations requiring review.
 
 ```javascript
-const { label, resolverUpdated } = await getResolverInfo(client, resolverAddress)
+const { label, resolverUpdated, review } = await getResolverInfo(client, resolverAddress)
 const resolverAge = Math.floor(Date.now() / 1000) - Number(resolverUpdated)
 
 if (resolverAge < 90 * 24 * 60 * 60) { // 90 days for high security
   console.warn(`⚠️ Resolver for "${label}" changed ${Math.floor(resolverAge / 86400)} days ago`)
   // Reject or require security review
 }
+
+// Check admin review status
+if (review && review !== "verified") {
+  console.warn(`⚠️ Resolver "${label}" review status: ${review}`)
+}
 ```
+
+### Resolver Review System
+
+**ECS registry administrators can assign review strings to credential resolvers** to indicate trust levels, certification status, or security assessments. For example:
+
+```
+Status: Verified, Audit Score: 85/100, Date: 2025-04-21
+```
+
+This enables the ECS protocol to curate and communicate the quality or trustworthiness of credential resolvers, helping clients make informed trust decisions beyond just resolver age.
 
 **Planned Upgrades:** Resolvers can announce upcoming upgrades via the [`resolver-info` text record](https://github.com/nxt3d/ensips/blob/resolver-info-metadata/ensips/resolver-info-text-record.md), including the bytecode hash of the new implementation. Clients can whitelist this hash to maintain continuous resolution even when the resolver upgrades, verifying the upgrade follows the expected path.
 
@@ -120,8 +136,8 @@ if (resolverAge < 90 * 24 * 60 * 60) { // 90 days for high security
 
 ### Sepolia Testnet
 
-**Version:** 0.2.0-beta  
-**Date:** December 5, 2025  
+**Version:** 0.2.1-beta  
+**Date:** December 6, 2025  
 **Network:** Sepolia (Chain ID: 11155111)  
 **Status:** ✅ Live and operational (Deployment 03 - Minimal Clone Factory)
 
@@ -166,10 +182,10 @@ if (resolverAge < 90 * 24 * 60 * 60) { // 90 days for high security
 ```bash
 # Get label from resolver address (for Hooks)
 cast call 0x4f2F0e7b61d9Bd0e30F186D6530Efc92429Fcc77 \
-  "getResolverInfo(address)(string,uint128)" \
+  "getResolverInfo(address)(string,uint128,string)" \
   0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa \
   --rpc-url https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
-# Returns: "name-stars", <timestamp>
+# Returns: "name-stars", <timestamp>, ""
 ```
 
 **Using @nxt3d/ecsjs:**
@@ -188,11 +204,11 @@ const client = createECSClient({
 })
 
 // Get resolver info from resolver address
-const { label, resolverUpdated } = await getResolverInfo(
+const { label, resolverUpdated, review } = await getResolverInfo(
   client,
   '0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa'
 )
-// Returns: { label: "name-stars", resolverUpdated: <timestamp>n }
+// Returns: { label: "name-stars", resolverUpdated: <timestamp>n, review: "" }
 
 // Or resolve credential directly
 const credential = await resolveCredential(
