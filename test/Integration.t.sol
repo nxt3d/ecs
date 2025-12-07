@@ -83,7 +83,8 @@ contract IntegrationTest is Test {
         vm.startPrank(provider);
         
         // Provider creates their own specific resolver
-        providerResolver = new CredentialResolver(provider);
+        providerResolver = new CredentialResolver();
+        providerResolver.initialize(provider);
         
         // Commit
         bytes32 commitment = registrar.createCommitment(PROVIDER_LABEL, provider, address(providerResolver), DURATION, secret);

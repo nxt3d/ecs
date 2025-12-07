@@ -25,8 +25,8 @@ contract CredentialResolverFactoryTest is Test {
     function setUp() public {
         vm.startPrank(factory);
         
-        // Deploy implementation (factory will be the initial owner)
-        implementation = new CredentialResolver(factory);
+        // Deploy implementation
+        implementation = new CredentialResolver();
         
         // Deploy factory
         resolverFactory = new CredentialResolverFactory(address(implementation));
@@ -116,7 +116,8 @@ contract CredentialResolverFactoryTest is Test {
     function test_005____createResolver______________GasSavings() public {
         // Deploy a regular CredentialResolver
         uint256 gasBefore = gasleft();
-        new CredentialResolver(user1);
+        CredentialResolver regular = new CredentialResolver();
+        regular.initialize(user1);
         uint256 regularGas = gasBefore - gasleft();
         
         // Deploy a clone
@@ -134,10 +135,14 @@ contract CredentialResolverFactoryTest is Test {
         assertTrue(cloneGas < regularGas);
     }
     
-    function test_006____initialize_________________ImplementationIsAlreadyInitialized() public {
-        // Implementation should be already initialized (can't be initialized again)
-        vm.expectRevert(abi.encodeWithSignature("AlreadyInitialized()"));
+    function test_006____initialize_________________ImplementationCanBeInitializedOnce() public {
+        // Implementation can be initialized once (for testing)
         implementation.initialize(user1);
+        assertEq(implementation.owner(), user1);
+        
+        // But cannot be initialized again
+        vm.expectRevert(abi.encodeWithSignature("InvalidInitialization()"));
+        implementation.initialize(user2);
     }
     
     function test_007____initialize_________________CloneCanOnlyBeInitializedOnce() public {
@@ -149,14 +154,15 @@ contract CredentialResolverFactoryTest is Test {
         assertEq(CredentialResolver(clone).owner(), user1);
         
         // Second initialization should fail
-        vm.expectRevert(abi.encodeWithSignature("AlreadyInitialized()"));
+        vm.expectRevert(abi.encodeWithSignature("InvalidInitialization()"));
         CredentialResolver(clone).initialize(user2);
     }
     
     function test_008____initialize_________________CannotInitializeWithZeroAddress() public {
-        // Deploy implementation with zero address should revert
+        // Initialize with zero address should revert
+        CredentialResolver resolver = new CredentialResolver();
         vm.expectRevert(abi.encodeWithSignature("OwnableInvalidOwner(address)", address(0)));
-        new CredentialResolver(address(0));
+        resolver.initialize(address(0));
     }
     
     function test_009____initialize_________________FactoryCannotCreateResolverForZeroAddress() public {

@@ -18,7 +18,8 @@ contract CredentialResolverTest is Test {
     /* --- Setup --- */
     
     function setUp() public {
-        resolver = new CredentialResolver(owner);
+        resolver = new CredentialResolver();
+        resolver.initialize(owner);
     }
     
     /* --- Test Dividers --- */

@@ -6,12 +6,13 @@ pragma solidity ^0.8.25;
  * @author Unruggable
  * @notice A simple ENS resolver with text, addr, contenthash, and data support.
  */
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IExtendedResolver} from "./IExtendedResolver.sol";
 import {NameCoder} from "./utils/NameCoder.sol";
 
-contract CredentialResolver is Ownable, IERC165, IExtendedResolver {
+contract CredentialResolver is Initializable, OwnableUpgradeable, IERC165, IExtendedResolver {
 
     // ENS method selectors
     bytes4 public constant ADDR_SELECTOR = bytes4(keccak256("addr(bytes32)"));
@@ -28,9 +29,6 @@ contract CredentialResolver is Ownable, IERC165, IExtendedResolver {
     bytes private contenthashRecord;
     mapping(string key => string value) private textRecords;
     mapping(string key => bytes data) private dataRecords;
-    
-    // Clone initialization tracking
-    bool private initialized;
 
     // Events
     event AddrChanged(address a);
@@ -39,26 +37,20 @@ contract CredentialResolver is Ownable, IERC165, IExtendedResolver {
     event TextChanged(string indexed key, string value);
     event DataChanged(string indexed key, bytes data);
 
-    // Errors
-    error AlreadyInitialized();
-
     /**
-     * @notice Constructor
-     * @param _owner The address to set as the owner (for non-clone deployments)
+     * @notice Constructor for implementation contract
+     * @dev Implementation can be initialized for testing, but clones are the intended usage
      */
-    constructor(address _owner) Ownable(_owner) {
-        // Mark as initialized for the implementation
-        initialized = true;
+    constructor() {
+        // Empty constructor - initializer modifier prevents double initialization
     }
 
     /**
      * @notice Initialize a cloned resolver (only callable once per clone)
      * @param _owner The address to set as the owner
      */
-    function initialize(address _owner) external {
-        if (initialized) revert AlreadyInitialized();
-        initialized = true;
-        _transferOwnership(_owner);
+    function initialize(address _owner) external initializer {
+        __Ownable_init(_owner);
     }
 
     /**
