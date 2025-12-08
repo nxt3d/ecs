@@ -14,14 +14,15 @@ console.log('🔍 Testing ECS Query Examples')
 console.log('='.repeat(50))
 
 try {
-  const resolverAddress = '0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa'
+  const resolverAddress = '0xc8028D202838FF7D14835c75906A07839837C160'
   const credentialKey = 'eth.ecs.name-stars.starts:vitalik.eth'
 
   // Get label from resolver address (for Hooks)
   console.log('\n1. Get label from resolver address...')
-  const { label, resolverUpdated } = await getResolverInfo(client, resolverAddress)
+  const { label, resolverUpdated, review } = await getResolverInfo(client, resolverAddress)
   console.log(`   ✅ Label: "${label}"`)
   console.log(`   ✅ Updated: ${resolverUpdated}`)
+  console.log(`   ✅ Review: "${review || '(empty)'}"`)
 
   // Query credential using ecsjs
   console.log('\n2. Query credential using ecsjs...')
