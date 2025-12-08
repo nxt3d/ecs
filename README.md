@@ -137,21 +137,21 @@ This enables the ECS protocol to curate and communicate the quality or trustwort
 ### Sepolia Testnet
 
 **Version:** 0.2.1-beta  
-**Date:** December 6, 2025  
+**Date:** December 7, 2025  
 **Network:** Sepolia (Chain ID: 11155111)  
-**Status:** ✅ Live and operational (Deployment 03 - Minimal Clone Factory)
+**Status:** ✅ Live and operational (Deployment 01 - Resolver Review System + OwnableUpgradeable)
 
 #### Deployed Contracts
 
 | Contract | Address | Verified |
 |----------|---------|----------|
-| ECS Registry | `0x4f2F0e7b61d9Bd0e30F186D6530Efc92429Fcc77` | [✅ View](https://sepolia.etherscan.io/address/0x4f2F0e7b61d9Bd0e30F186D6530Efc92429Fcc77) |
-| ECS Registrar | `0x3f971176d86f223bB8A664F7ce006B818d1D5649` | [✅ View](https://sepolia.etherscan.io/address/0x3f971176d86f223bB8A664F7ce006B818d1D5649) |
-| Credential Resolver (Implementation) | `0x04c55c4CCAf0b7bb2e00bc3ea72a92585FE35683` | [✅ View](https://sepolia.etherscan.io/address/0x04c55c4CCAf0b7bb2e00bc3ea72a92585FE35683) |
-| Credential Resolver Factory | `0x3d9BFC750F1eb7EDaDA2DB0e5dE0F763c30446c1` | [✅ View](https://sepolia.etherscan.io/address/0x3d9bfc750f1eb7edada2db0e5de0f763c30446c1) |
-| Credential Resolver (Clone - name-stars) | `0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa` | [View](https://sepolia.etherscan.io/address/0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa) |
+| ECS Registry | `0xb09C149664773bFA88B72FA41437AdADcB8bF5B4` | [✅ View](https://sepolia.etherscan.io/address/0xb09C149664773bFA88B72FA41437AdADcB8bF5B4) |
+| ECS Registrar | `0xD1399C6879EA5A92eB25ee8A0512c7a4fC0DDc6b` | [✅ View](https://sepolia.etherscan.io/address/0xD1399C6879EA5A92eB25ee8A0512c7a4fC0DDc6b) |
+| Credential Resolver (Implementation) | `0x9eC339D221dB86e5bcfB12B7861b3F8e41a5D5d9` | [✅ View](https://sepolia.etherscan.io/address/0x9eC339D221dB86e5bcfB12B7861b3F8e41a5D5d9) |
+| Credential Resolver Factory | `0x9b2d7A50bb15F5147c2cf46f05FBfD0E931AB77A` | [✅ View](https://sepolia.etherscan.io/address/0x9b2d7A50bb15F5147c2cf46f05FBfD0E931AB77A) |
+| Credential Resolver (Clone - name-stars) | `0xc8028D202838FF7D14835c75906A07839837C160` | [View](https://sepolia.etherscan.io/address/0xc8028D202838FF7D14835c75906A07839837C160) |
 
-> **New:** Resolver deployments now use EIP-1167 minimal clones, providing **91% gas savings** (1.98M gas → 169K gas per resolver)
+> **New in v0.2.1:** Resolver review system for admin trust ratings + OwnableUpgradeable pattern for clones
 
 #### Configuration
 
@@ -167,8 +167,8 @@ This enables the ECS protocol to curate and communicate the quality or trustwort
 
 - **Status:** ✅ Registered
 - **Owner:** `0xF8e03bd4436371E0e2F7C02E529b2172fe72b4EF`
-- **Resolver:** `0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa` (minimal clone)
-- **Expires:** December 5, 2026
+- **Resolver:** `0xc8028D202838FF7D14835c75906A07839837C160` (minimal clone)
+- **Expires:** December 7, 2026
 
 **Credential Records:**
 - **Key:** `eth.ecs.name-stars.starts:vitalik.eth`
@@ -181,9 +181,9 @@ This enables the ECS protocol to curate and communicate the quality or trustwort
 
 ```bash
 # Get label from resolver address (for Hooks)
-cast call 0x4f2F0e7b61d9Bd0e30F186D6530Efc92429Fcc77 \
+cast call 0xb09C149664773bFA88B72FA41437AdADcB8bF5B4 \
   "getResolverInfo(address)(string,uint128,string)" \
-  0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa \
+  0xc8028D202838FF7D14835c75906A07839837C160 \
   --rpc-url https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
 # Returns: "name-stars", <timestamp>, ""
 ```
@@ -206,14 +206,14 @@ const client = createECSClient({
 // Get resolver info from resolver address
 const { label, resolverUpdated, review } = await getResolverInfo(
   client,
-  '0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa'
+  '0xc8028D202838FF7D14835c75906A07839837C160'
 )
 // Returns: { label: "name-stars", resolverUpdated: <timestamp>n, review: "" }
 
 // Or resolve credential directly
 const credential = await resolveCredential(
   client,
-  '0x9773397bd9366D80dAE708CA4C4413Abf88B3DAa',
+  '0xc8028D202838FF7D14835c75906A07839837C160',
   'eth.ecs.name-stars.starts:vitalik.eth'
 )
 // Returns: "100"
@@ -226,7 +226,7 @@ npm run hook  # Full Hooks resolution flow
 npm run resolve  # Direct text record resolution
 ```
 
-For full deployment details, see `deployments/sepolia-2025-12-05-02.md`
+For full deployment details, see `deployments/sepolia-2025-12-07-01.md`
 
 ## Getting Started
 
@@ -248,4 +248,4 @@ See deployment scripts in `script/`:
 - `DeployAndCommit.s.sol` - Deploy contracts and commit registration
 - `RegisterAndSetup.s.sol` - Complete registration after 60s wait
 
-For full deployment details, see `deployments/sepolia-2025-12-05-02.md`
+For full deployment details, see `deployments/sepolia-2025-12-07-01.md`
