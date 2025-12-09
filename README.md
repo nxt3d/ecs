@@ -41,6 +41,7 @@ These are contracts that are built and registered. They can be:
 *   **Onchain Resolvers:** Storing attestation data directly on Ethereum.
 *   **Offchain/L2 Resolvers:** Using CCIP-Read to fetch data from Optimism, Base, or a centralized server, verified by signatures or proofs.
 *   **Standard ENS Resolvers:** Since they implement standard ENS methods (`text`, `addr`, etc.), they work with any ENS client.
+*   **Specialized Resolvers:** Like [CCResolver](./CCResolver-README.md) for controlled accounts verification via ERC-8092, demonstrating the flexibility of the ECS system.
 
 ## Usage Flow with Hooks
 
@@ -175,6 +176,58 @@ This enables the ECS protocol to curate and communicate the quality or trustwort
 - **Text Value:** `"100"`
 - **Data Value:** `100` (uint256)
 
+##### controlled-accounts.ecs.eth
+
+- **Status:** ✅ Registered
+- **Owner:** `0xF8e03bd4436371E0e2F7C02E529b2172fe72b4EF`
+- **Resolver:** `0xAE5A879A021982B65A691dFdcE83528e8e13dFd3` (CCResolver v0.1.0)
+- **Expires:** 2035 (10 years)
+
+**Features:**
+- Full ENS Extended Resolver implementation
+- Controlled accounts verification via ERC-8092 Associated Accounts
+- Real-time signature verification through AssociationsStore
+- Returns YAML-formatted data with parent/child accounts in ERC-7930 format
+- Implements `resolver-info` standard for metadata discovery
+
+**Text Record Keys:**
+- **Controlled Accounts:** `eth.ecs.controlled-accounts:<id>` - Returns YAML with verified parent and child accounts
+- **Resolver Info:** `resolver-info` - Returns metadata about the resolver (version, features, standards)
+
+**Query Example:**
+
+```javascript
+import { createPublicClient, http } from 'viem'
+import { sepolia } from 'viem/chains'
+
+const client = createPublicClient({
+  chain: sepolia,
+  transport: http('https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY')
+})
+
+// Query controlled accounts using ENS text record
+const yaml = await client.getEnsText({
+  name: 'controlled-accounts.ecs.eth',
+  key: 'eth.ecs.controlled-accounts:0'
+})
+
+// Returns YAML like:
+// id: 0
+// registeredAt: 1765302228
+// parent: "0x0001000003aa36a7144d45cd7472f2c46e81734c561a2d0b4b66c8fefe"
+// children:
+//   - "0x0001000003aa36a714f935f966a073746a9ee0f6a685a41da23a64e1d1"
+//   - "0x0001000003aa36a714cc8d7b159eafa8a2c4ca5c88c3f6b760761dbf28"
+```
+
+**Test the integration:**
+
+```bash
+npm run test-cc  # Run full CCResolver integration tests
+```
+
+For complete documentation, see [CCResolver-README.md](./CCResolver-README.md)
+
 #### Query Examples
 
 **Using Cast:**
@@ -219,11 +272,12 @@ const credential = await resolveCredential(
 // Returns: "100"
 ```
 
-**Run the demo:**
+**Run the demos:**
 
 ```bash
-npm run hook  # Full Hooks resolution flow
+npm run hook     # Full Hooks resolution flow
 npm run resolve  # Direct text record resolution
+npm run test-cc  # CCResolver controlled accounts integration
 ```
 
 For full deployment details, see `deployments/sepolia-2025-12-07-01.md`
