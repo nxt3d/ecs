@@ -2,7 +2,7 @@
   "name": "ecs-contracts",
   "version": "0.2.1-beta",
   "type": "module",
-  "description": "Ethereum Credential Service V2 - Smart Contracts and Scripts",
+  "description": "Ethereum Credential Service - A decentralized registry of Smart Credentials",
   "private": true,
   "scripts": {
     "resolve": "node scripts/resolve-text-record.js",

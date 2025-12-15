@@ -1,6 +1,6 @@
 # CCResolver Integration
 
-CCResolver is an ENS Extended Resolver that provides verifiable on-chain proof of controlled accounts through cryptographic signatures using the ERC-8092 Associated Accounts standard.
+CCResolver is an ENS Extended Resolver that provides Smart Credentials with verifiable on-chain proof of controlled accounts through cryptographic signatures using the ERC-8092 Associated Accounts standard.
 
 ## Deployment
 

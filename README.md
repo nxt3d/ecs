@@ -3,9 +3,9 @@
 **Version:** 0.2.1-beta  
 **Status:** Beta - Deployed on Sepolia
 
-**ECS V2** is a simplified, decentralized registry for "known" credential resolvers. Entities can register a unique namespace (e.g., `my-service.ecs.eth`) and point it to a standard ENS resolver that serves credential data.
+**ECS V2** is a decentralized registry of Smart Credentials—verifiable onchain or offchain data about any identity. Smart Credentials are implemented as Extended Resolvers. ECS supports both public and privacy-preserving credentials using Zero Knowledge Proofs (ZKPs), enabling users to prove attributes without revealing underlying data.
 
-ECS V2 is built to be fully compatible with the [ENS Hooks standard](https://github.com/nxt3d/ensips/blob/hooks/ensips/hooks.md), enabling ENS names to "jump" to these known resolvers to securely resolve onchain or offchain records.
+Entities can register a unique namespace (e.g., `my-service.ecs.eth`) and point it to their Smart Credential (Extended Resolver). ECS is built to be fully compatible with the [ENS Hooks standard](https://github.com/nxt3d/ensips/blob/hooks/ensips/hooks.md), enabling ENS names to securely resolve Smart Credentials.
 
 ## Installation
 
@@ -19,11 +19,11 @@ npm install @nxt3d/ecsjs@0.2.4-beta
 
 ## Goals of V2
 
-*   **Simplicity:** The complex multi-level registry has been replaced with a flat, single-label registry. Labels (e.g., `optimism`) map directly to resolvers.
-*   **Standard Resolvers:** Credential resolvers are now just standard [ENSIP-10 (Extended Resolver)](https://docs.ens.domains/ens-improvement-proposals/ensip-10-wildcard-resolution) contracts. This means any existing ENS tooling can interact with them.
-*   **Flexible Data:** Credential providers can define their own schema and keys. There's no forced structure for credential data.
-*   **Hooks Integration:** ECS serves as the registry for [Hooks](https://github.com/nxt3d/ensips/blob/hooks/ensips/hooks.md). Hooks in ENS text records can reference ECS resolvers to fetch trusted data.
-*   **`ecs.eth` Resolution:** Credentials are resolved through service subdomains (e.g., `my-service.ecs.eth`). Queries use specific keys (e.g., `eth.ecs.my-service.credential:vitalik.eth`) to fetch data for a target identity.
+*   **Simplicity:** The complex multi-level registry has been replaced with a flat, single-label registry. Labels (e.g., `optimism`) map directly to Smart Credentials.
+*   **Standard Extended Resolvers:** Smart Credentials are implemented as standard [ENSIP-10 (Extended Resolver)](https://docs.ens.domains/ens-improvement-proposals/ensip-10-wildcard-resolution) contracts. This means any existing ENS tooling can interact with them.
+*   **Flexible Data:** Smart Credential providers can define their own schema and keys. There's no forced structure for credential data.
+*   **Hooks Integration:** ECS serves as the registry for [Hooks](https://github.com/nxt3d/ensips/blob/hooks/ensips/hooks.md). Hooks in ENS text records can reference registered Smart Credentials.
+*   **`ecs.eth` Resolution:** Smart Credentials are resolved through service subdomains (e.g., `my-service.ecs.eth`). Queries use specific keys (e.g., `eth.ecs.my-service.credential:vitalik.eth`) to fetch data for a target identity.
 
 ## Architecture
 
@@ -32,37 +32,38 @@ The core contract. It maintains a mapping of:
 `LabelHash -> (Owner, Expiration)`
 
 *   **ENS Integration:** When a label is registered, ECS automatically creates the corresponding subname (e.g., `my-service.ecs.eth`) in the official **ENS Registry**.
-*   **Resolver Management:** The resolver address is stored directly on the ENS Registry record for that subname.
+*   **Smart Credential Management:** The Smart Credential address is stored directly on the ENS Registry record for that subname.
 *   **Ownership:** ECS retains ownership of the ENS subnode to ensure protocol rules, while the logical owner manages the record via the ECS Registry.
 *   **Commit/Reveal:** Secure updates using a commitment pattern to prevent front-running.
 
-### 2. Known Resolvers
-These are contracts that are built and registered. They can be:
-*   **Onchain Resolvers:** Storing attestation data directly on Ethereum.
-*   **Offchain/L2 Resolvers:** Using CCIP-Read to fetch data from Optimism, Base, or a centralized server, verified by signatures or proofs.
-*   **Standard ENS Resolvers:** Since they implement standard ENS methods (`text`, `addr`, etc.), they work with any ENS client.
-*   **Specialized Resolvers:** Like [CCResolver](./CCResolver-README.md) for controlled accounts verification via ERC-8092, demonstrating the flexibility of the ECS system.
+### 2. Smart Credentials
+Smart Credentials are Extended Resolver contracts that are built and registered. They can be:
+*   **Onchain Smart Credentials:** Storing attestation data directly on Ethereum.
+*   **Offchain/L2 Smart Credentials:** Using CCIP-Read to fetch data from Optimism, Base, or a centralized server, verified by signatures or proofs.
+*   **Privacy-Preserving Smart Credentials:** Supporting Zero Knowledge Proofs (ZKPs) to prove attributes without revealing underlying data.
+*   **Standard ENS Extended Resolvers:** Since they implement standard ENS methods (`text`, `addr`, etc.), they work with any ENS client.
+*   **Specialized Smart Credentials:** Like [CCResolver](./CCResolver-README.md) for controlled accounts verification via ERC-8092, demonstrating the flexibility of the ECS system.
 
 ## Usage Flow with Hooks
 
-Hooks enable ENS names to redirect queries to known resolvers.
+Hooks enable ENS names to redirect queries to registered Smart Credentials.
 
 1.  **User** sets a text record on their ENS name (e.g., `maria.eth`) containing a **Hook**:
     ```
-    hook("text(bytes32,string)", <ECS_RESOLVER_ADDRESS>)
+    hook("text(bytes32,string)", <SMART_CREDENTIAL_ADDRESS>)
     ```
-2.  **Client** reads this record and extracts the `<ECS_RESOLVER_ADDRESS>`.
-3.  **Client** calls `getResolverInfo(<ECS_RESOLVER_ADDRESS>)` on the ECS Registry to:
+2.  **Client** reads this record and extracts the `<SMART_CREDENTIAL_ADDRESS>`.
+3.  **Client** calls `getResolverInfo(<SMART_CREDENTIAL_ADDRESS>)` on the ECS Registry to:
     - Find its registered label (e.g., `my-service`)
-    - Check the `resolverUpdated` timestamp to verify resolver stability
+    - Check the `resolverUpdated` timestamp to verify Smart Credential stability
     - Read the `review` field for admin-assigned ratings or certifications
-    - **Make a trust decision** based on resolver age and review status
+    - **Make a trust decision** based on Smart Credential age and review status
 4.  **Client** constructs the service name `my-service.ecs.eth` (optional, for provenance).
-5.  **Client** queries the resolver directly: `text(node, "credential-key")`.
-    - Note: Single-label resolvers ignore the `node` parameter, so any value (including `0x0`) works.
-6.  **Resolver** returns the verified credential data.
+5.  **Client** queries the Smart Credential directly: `text(node, "credential-key")`.
+    - Note: Single-label Smart Credentials ignore the `node` parameter, so any value (including `0x0`) works.
+6.  **Smart Credential** returns the verified credential data.
 
-This creates a trusted link to the record, where `maria.eth` doesn't store the record herself; instead, the record can be resolved against a "known" trusted resolver.
+This creates a trusted link to the record, where `maria.eth` doesn't store the record herself; instead, the data is resolved from a trusted registered Smart Credential.
 
 ### Example: Resolving a Hook
 
@@ -79,16 +80,16 @@ const client = createECSClient({
   rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY'
 })
 
-// User has hook pointing to resolver
-const resolverAddress = '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e'
+// User has hook pointing to Smart Credential
+const smartCredentialAddress = '0x03eb9Bf23c828E3891A8fE3cB484A7ca769B985e'
 const credentialKey = 'eth.ecs.name-stars.starts:vitalik.eth'
 
 // Get label and resolve credential in one call
-const credential = await resolveCredential(client, resolverAddress, credentialKey)
+const credential = await resolveCredential(client, smartCredentialAddress, credentialKey)
 // Returns: "100"
 
-// Or get resolver info
-const { label, resolverUpdated, review } = await getResolverInfo(client, resolverAddress)
+// Or get Smart Credential info
+const { label, resolverUpdated, review } = await getResolverInfo(client, smartCredentialAddress)
 // Returns: { label: "name-stars", resolverUpdated: 1234567890n, review: "" }
 
 // You can also use viem's ENS functions directly
@@ -100,38 +101,38 @@ const textValue = await client.getEnsText({
 // Returns: "100"
 ```
 
-## Resolver Trust and Freshness
+## Smart Credential Trust and Freshness
 
-**ECS strictly enforces a one-to-one relationship between labels and resolvers.** While label owners can change resolvers (necessary for upgrades), this introduces a security concern. The registry tracks `resolverUpdated` timestamps, allowing clients to enforce security policies based on resolver age.
+**ECS strictly enforces a one-to-one relationship between labels and Smart Credentials.** While label owners can change Smart Credentials (necessary for upgrades), this introduces a security concern. The registry tracks `resolverUpdated` timestamps, allowing clients to enforce security policies based on Smart Credential age.
 
-**Security-conscious clients can require resolvers to be established (e.g., 90+ days old) before trusting them.** Recent resolver changes may indicate compromise, untested deployments, or migrations requiring review.
+**Security-conscious clients can require Smart Credentials to be established (e.g., 90+ days old) before trusting them.** Recent changes may indicate compromise, untested deployments, or migrations requiring review.
 
 ```javascript
 const { label, resolverUpdated, review } = await getResolverInfo(client, resolverAddress)
-const resolverAge = Math.floor(Date.now() / 1000) - Number(resolverUpdated)
+const credentialAge = Math.floor(Date.now() / 1000) - Number(resolverUpdated)
 
-if (resolverAge < 90 * 24 * 60 * 60) { // 90 days for high security
-  console.warn(`⚠️ Resolver for "${label}" changed ${Math.floor(resolverAge / 86400)} days ago`)
+if (credentialAge < 90 * 24 * 60 * 60) { // 90 days for high security
+  console.warn(`⚠️ Smart Credential "${label}" changed ${Math.floor(credentialAge / 86400)} days ago`)
   // Reject or require security review
 }
 
 // Check admin review status
 if (review && review !== "verified") {
-  console.warn(`⚠️ Resolver "${label}" review status: ${review}`)
+  console.warn(`⚠️ Smart Credential "${label}" review status: ${review}`)
 }
 ```
 
-### Resolver Review System
+### Smart Credential Review System
 
-**ECS registry administrators can assign review strings to credential resolvers** to indicate trust levels, certification status, or security assessments. For example:
+**ECS registry administrators can assign review strings to Smart Credentials** to indicate trust levels, certification status, or security assessments. For example:
 
 ```
 Status: Verified, Audit Score: 85/100, Date: 2025-04-21
 ```
 
-This enables the ECS protocol to curate and communicate the quality or trustworthiness of credential resolvers, helping clients make informed trust decisions beyond just resolver age.
+This enables the ECS protocol to curate and communicate the quality or trustworthiness of Smart Credentials, helping clients make informed trust decisions beyond just age.
 
-**Planned Upgrades:** Resolvers can announce upcoming upgrades via the [`resolver-info` text record](https://github.com/nxt3d/ensips/blob/resolver-info-metadata/ensips/resolver-info-text-record.md), including the bytecode hash of the new implementation. Clients can whitelist this hash to maintain continuous resolution even when the resolver upgrades, verifying the upgrade follows the expected path.
+**Planned Upgrades:** Smart Credentials can announce upcoming upgrades via the [`resolver-info` text record](https://github.com/nxt3d/ensips/blob/resolver-info-metadata/ensips/resolver-info-text-record.md), including the bytecode hash of the new implementation. Clients can whitelist this hash to maintain continuous resolution even when the Smart Credential upgrades, verifying the upgrade follows the expected path.
 
 ## Deployments
 
@@ -140,7 +141,7 @@ This enables the ECS protocol to curate and communicate the quality or trustwort
 **Version:** 0.2.1-beta  
 **Date:** December 7, 2025  
 **Network:** Sepolia (Chain ID: 11155111)  
-**Status:** ✅ Live and operational (Deployment 01 - Resolver Review System + OwnableUpgradeable)
+**Status:** ✅ Live and operational (Deployment 01 - Smart Credential Review System + OwnableUpgradeable)
 
 #### Deployed Contracts
 
@@ -152,7 +153,7 @@ This enables the ECS protocol to curate and communicate the quality or trustwort
 | Credential Resolver Factory | `0x9b2d7A50bb15F5147c2cf46f05FBfD0E931AB77A` | [✅ View](https://sepolia.etherscan.io/address/0x9b2d7A50bb15F5147c2cf46f05FBfD0E931AB77A) |
 | Credential Resolver (Clone - name-stars) | `0xc8028D202838FF7D14835c75906A07839837C160` | [View](https://sepolia.etherscan.io/address/0xc8028D202838FF7D14835c75906A07839837C160) |
 
-> **New in v0.2.1:** Resolver review system for admin trust ratings + OwnableUpgradeable pattern for clones
+> **New in v0.2.1:** Smart Credential review system for admin trust ratings + OwnableUpgradeable pattern for clones
 
 #### Configuration
 
@@ -168,7 +169,7 @@ This enables the ECS protocol to curate and communicate the quality or trustwort
 
 - **Status:** ✅ Registered
 - **Owner:** `0xF8e03bd4436371E0e2F7C02E529b2172fe72b4EF`
-- **Resolver:** `0xc8028D202838FF7D14835c75906A07839837C160` (minimal clone)
+- **Smart Credential:** `0xc8028D202838FF7D14835c75906A07839837C160` (minimal clone)
 - **Expires:** December 7, 2026
 
 **Credential Records:**
@@ -180,11 +181,11 @@ This enables the ECS protocol to curate and communicate the quality or trustwort
 
 - **Status:** ✅ Registered
 - **Owner:** `0xF8e03bd4436371E0e2F7C02E529b2172fe72b4EF`
-- **Resolver:** `0xAE5A879A021982B65A691dFdcE83528e8e13dFd3` (CCResolver v0.1.0)
+- **Smart Credential:** `0xAE5A879A021982B65A691dFdcE83528e8e13dFd3` (CCResolver v0.1.0)
 - **Expires:** 2035 (10 years)
 
 **Features:**
-- Full ENS Extended Resolver implementation
+- Full ENS Extended Resolver implementation (Smart Credential)
 - Controlled accounts verification via ERC-8092 Associated Accounts
 - Real-time signature verification through AssociationsStore
 - Returns YAML-formatted data with parent/child accounts in ERC-7930 format
@@ -233,7 +234,7 @@ For complete documentation, see [CCResolver-README.md](./CCResolver-README.md)
 **Using Cast:**
 
 ```bash
-# Get label from resolver address (for Hooks)
+# Get label from Smart Credential address (for Hooks)
 cast call 0xb09C149664773bFA88B72FA41437AdADcB8bF5B4 \
   "getResolverInfo(address)(string,uint128,string)" \
   0xc8028D202838FF7D14835c75906A07839837C160 \
@@ -256,7 +257,7 @@ const client = createECSClient({
   rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY'
 })
 
-// Get resolver info from resolver address
+// Get Smart Credential info from address
 const { label, resolverUpdated, review } = await getResolverInfo(
   client,
   '0xc8028D202838FF7D14835c75906A07839837C160'
