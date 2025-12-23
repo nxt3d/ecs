@@ -2,6 +2,7 @@
 pragma solidity ^0.8.27;
 
 import "forge-std/Test.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import "../src/ECSRegistry.sol";
 import "../src/ECSRegistrar.sol";
 import "../src/CredentialResolver.sol";
@@ -13,6 +14,8 @@ interface ITextResolver {
 }
 
 contract IntegrationTest is Test {
+    using Clones for address;
+    
     /* --- Test Accounts --- */
     
     address admin = address(0x1001);
@@ -25,6 +28,7 @@ contract IntegrationTest is Test {
     ECSRegistrar public registrar;
     ENSRegistry public ensRegistry;
     CredentialResolver public providerResolver;
+    CredentialResolver public resolverImplementation;
     
     bytes32 public rootNode;
     
@@ -61,6 +65,10 @@ contract IntegrationTest is Test {
         prices[0] = PRICE_PER_SEC;
         registrar.setPricingForAllLengths(prices);
         registrar.setParams(60, type(uint64).max, 3, 64);
+        
+        // Deploy CredentialResolver implementation for cloning
+        resolverImplementation = new CredentialResolver();
+        
         vm.stopPrank();
         
         // Fund provider
@@ -82,8 +90,9 @@ contract IntegrationTest is Test {
         
         vm.startPrank(provider);
         
-        // Provider creates their own specific resolver
-        providerResolver = new CredentialResolver();
+        // Provider creates their own specific resolver (clone)
+        address clone = address(resolverImplementation).clone();
+        providerResolver = CredentialResolver(clone);
         providerResolver.initialize(provider);
         
         // Commit

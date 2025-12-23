@@ -4,15 +4,17 @@ pragma solidity ^0.8.25;
 /**
  * @title CredentialResolver
  * @author Unruggable
- * @notice A simple ENS resolver with text, addr, contenthash, and data support.
+ * @notice A Smart Credential resolver with text, addr, contenthash, and data support.
  */
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IExtendedResolver} from "./IExtendedResolver.sol";
+import {ERC8049} from "./extensions/ERC8049.sol";
+import {IERC8049} from "./interfaces/IERC8049.sol";
 import {NameCoder} from "./utils/NameCoder.sol";
 
-contract CredentialResolver is Initializable, OwnableUpgradeable, IERC165, IExtendedResolver {
+contract CredentialResolver is Initializable, Ownable, ERC8049, IERC165, IExtendedResolver {
 
     // ENS method selectors
     bytes4 public constant ADDR_SELECTOR = bytes4(keccak256("addr(bytes32)"));
@@ -28,21 +30,19 @@ contract CredentialResolver is Initializable, OwnableUpgradeable, IERC165, IExte
     mapping(uint256 coinType => bytes value) private addressRecords;
     bytes private contenthashRecord;
     mapping(string key => string value) private textRecords;
-    mapping(string key => bytes data) private dataRecords;
 
     // Events
     event AddrChanged(address a);
     event AddressChanged(uint256 coinType, bytes newAddress);
     event ContenthashChanged(bytes hash);
     event TextChanged(string indexed key, string value);
-    event DataChanged(string indexed key, bytes data);
 
     /**
      * @notice Constructor for implementation contract
-     * @dev Implementation can be initialized for testing, but clones are the intended usage
+     * @dev Implementation contract should not be initialized - it's only used as a template for clones
      */
-    constructor() {
-        // Empty constructor - initializer modifier prevents double initialization
+    constructor() Ownable(msg.sender) {
+        _disableInitializers();
     }
 
     /**
@@ -50,7 +50,10 @@ contract CredentialResolver is Initializable, OwnableUpgradeable, IERC165, IExte
      * @param _owner The address to set as the owner
      */
     function initialize(address _owner) external initializer {
-        __Ownable_init(_owner);
+        if (_owner == address(0)) {
+            revert OwnableInvalidOwner(address(0));
+        }
+        _transferOwnership(_owner);
     }
 
     /**
@@ -84,9 +87,8 @@ contract CredentialResolver is Initializable, OwnableUpgradeable, IERC165, IExte
             string memory value = textRecords[key];
             return abi.encode(value);
         } else if (selector == DATA_SELECTOR) {
-            // data(bytes32,string) - decode key and return data value
             (, string memory keyStr) = abi.decode(data[4:], (bytes32, string));
-            bytes memory dataValue = dataRecords[keyStr];
+            bytes memory dataValue = getContractMetadata(keyStr);
             return abi.encode(dataValue);
         }
 
@@ -95,7 +97,9 @@ contract CredentialResolver is Initializable, OwnableUpgradeable, IERC165, IExte
     }
 
     function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
-        return interfaceId == type(IERC165).interfaceId || interfaceId == type(IExtendedResolver).interfaceId;
+        return interfaceId == type(IERC165).interfaceId 
+            || interfaceId == type(IExtendedResolver).interfaceId
+            || interfaceId == type(IERC8049).interfaceId;
     }
 
     // ============ ENS Resolver Functions ============
@@ -142,13 +146,12 @@ contract CredentialResolver is Initializable, OwnableUpgradeable, IERC165, IExte
     }
 
     /**
-     * @notice Set a data record.
-     * @param _key The data record key.
-     * @param _data The data record value.
+     * @notice Set contract metadata via ERC-8049.
+     * @param key The metadata key.
+     * @param value The metadata value.
      */
-    function setData(string calldata _key, bytes calldata _data) external onlyOwner {
-        dataRecords[_key] = _data;
-        emit DataChanged(_key, _data);
+    function setContractMetadata(string calldata key, bytes calldata value) external onlyOwner {
+        _setContractMetadata(key, value);
     }
 
     /**
@@ -178,12 +181,12 @@ contract CredentialResolver is Initializable, OwnableUpgradeable, IERC165, IExte
     }
 
     /**
-     * @notice Get a data record.
+     * @notice Get a data record via ERC-8049.
      * @param _key The data record key.
      * @return The data record value.
      */
     function data(bytes32, string calldata _key) external view returns (bytes memory) {
-        return dataRecords[_key];
+        return getContractMetadata(_key);
     }
 
     /**

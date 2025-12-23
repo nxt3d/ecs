@@ -114,35 +114,39 @@ contract CredentialResolverFactoryTest is Test {
     }
     
     function test_005____createResolver______________GasSavings() public {
-        // Deploy a regular CredentialResolver
-        uint256 gasBefore = gasleft();
-        CredentialResolver regular = new CredentialResolver();
-        regular.initialize(user1);
-        uint256 regularGas = gasBefore - gasleft();
+        // Deploy a regular CredentialResolver (implementation already deployed in setUp)
+        // Note: Implementation cannot be initialized, so we'll compare clone vs clone
+        // but measure the cost of deploying a full contract vs clone
         
-        // Deploy a clone
-        gasBefore = gasleft();
+        // Measure clone deployment via factory
+        uint256 gasBefore = gasleft();
         vm.prank(user1);
-        resolverFactory.createResolver(user1);
+        address clone = resolverFactory.createResolver(user1);
         uint256 cloneGas = gasBefore - gasleft();
         
-        console.log("Regular deployment gas:", regularGas);
-        console.log("Clone deployment gas:", cloneGas);
-        console.log("Gas saved:", regularGas - cloneGas);
-        console.log("Savings percentage:", ((regularGas - cloneGas) * 100) / regularGas);
+        // For comparison, measure deploying a new implementation (which is what regular deployment would be)
+        gasBefore = gasleft();
+        CredentialResolver newImpl = new CredentialResolver();
+        uint256 implGas = gasBefore - gasleft();
         
-        // Clone should be significantly cheaper
-        assertTrue(cloneGas < regularGas);
+        console.log("Implementation deployment gas:", implGas);
+        console.log("Clone deployment gas:", cloneGas);
+        console.log("Gas saved:", implGas - cloneGas);
+        if (implGas > 0) {
+            console.log("Savings percentage:", ((implGas - cloneGas) * 100) / implGas);
+        }
+        
+        // Clone should be significantly cheaper than deploying a new implementation
+        assertTrue(cloneGas < implGas);
     }
     
-    function test_006____initialize_________________ImplementationCanBeInitializedOnce() public {
-        // Implementation can be initialized once (for testing)
-        implementation.initialize(user1);
-        assertEq(implementation.owner(), user1);
-        
-        // But cannot be initialized again
+    function test_006____initialize_________________ImplementationCannotBeInitialized() public {
+        // Implementation has initializers disabled in constructor, so it cannot be initialized
         vm.expectRevert(abi.encodeWithSignature("InvalidInitialization()"));
-        implementation.initialize(user2);
+        implementation.initialize(user1);
+        
+        // Implementation owner is set to deployer in constructor
+        assertEq(implementation.owner(), factory);
     }
     
     function test_007____initialize_________________CloneCanOnlyBeInitializedOnce() public {
@@ -158,11 +162,14 @@ contract CredentialResolverFactoryTest is Test {
         CredentialResolver(clone).initialize(user2);
     }
     
-    function test_008____initialize_________________CannotInitializeWithZeroAddress() public {
-        // Initialize with zero address should revert
-        CredentialResolver resolver = new CredentialResolver();
+    function test_008____initialize_________________CannotInitializeCloneWithZeroAddress() public {
+        // Create a clone manually (not through factory which checks this)
+        address clone = address(implementation).clone();
+        
+        // Initialize clone with zero address should revert
+        // Note: Factory already prevents this, but testing direct initialization
         vm.expectRevert(abi.encodeWithSignature("OwnableInvalidOwner(address)", address(0)));
-        resolver.initialize(address(0));
+        CredentialResolver(clone).initialize(address(0));
     }
     
     function test_009____initialize_________________FactoryCannotCreateResolverForZeroAddress() public {

@@ -2,10 +2,14 @@
 pragma solidity ^0.8.27;
 
 import "forge-std/Test.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import "../src/CredentialResolver.sol";
+import "../src/interfaces/IERC8049.sol";
 import "../src/utils/NameCoder.sol";
 
 contract CredentialResolverTest is Test {
+    using Clones for address;
+    
     /* --- Test Accounts --- */
     
     address owner = address(0x1001);
@@ -14,11 +18,17 @@ contract CredentialResolverTest is Test {
     /* --- Contract Variables --- */
     
     CredentialResolver public resolver;
+    CredentialResolver public implementation;
     
     /* --- Setup --- */
     
     function setUp() public {
-        resolver = new CredentialResolver();
+        // Deploy implementation
+        implementation = new CredentialResolver();
+        
+        // Create a clone for testing
+        address clone = address(implementation).clone();
+        resolver = CredentialResolver(clone);
         resolver.initialize(owner);
     }
     
@@ -49,23 +59,23 @@ contract CredentialResolverTest is Test {
         resolver.setText(key, value);
     }
     
-    function test_003____setData____________________OwnerCanSetData() public {
+    function test_003____setContractMetadata________OwnerCanSetContractMetadata() public {
         string memory key = "credential.score";
         bytes memory value = abi.encode(uint256(100));
         
         vm.prank(owner);
-        resolver.setData(key, value);
+        resolver.setContractMetadata(key, value);
         
         assertEq(resolver.data(bytes32(0), key), value);
     }
     
-    function test_004____setData____________________NonOwnerCannotSetData() public {
+    function test_004____setContractMetadata________NonOwnerCannotSetContractMetadata() public {
         string memory key = "credential.score";
         bytes memory value = abi.encode(uint256(100));
         
         vm.prank(notOwner);
         vm.expectRevert();
-        resolver.setData(key, value);
+        resolver.setContractMetadata(key, value);
     }
     
     function test_005____setAddr____________________OwnerCanSetAddress() public {
@@ -121,7 +131,7 @@ contract CredentialResolverTest is Test {
         bytes memory value = abi.encode("signature_data");
         
         vm.prank(owner);
-        resolver.setData(key, value);
+        resolver.setContractMetadata(key, value);
         
         bytes memory result = resolver.data(bytes32(0), key);
         assertEq(result, value);
@@ -192,5 +202,20 @@ contract CredentialResolverTest is Test {
     
     function test_018____supportsInterface__________SupportsIExtendedResolver() public {
         assertTrue(resolver.supportsInterface(type(IExtendedResolver).interfaceId));
+    }
+    
+    function test_019____supportsInterface__________SupportsIERC8049() public {
+        assertTrue(resolver.supportsInterface(type(IERC8049).interfaceId));
+    }
+    
+    function test_020____getContractMetadata_______ReturnsContractMetadata() public {
+        string memory key = "metadata.key";
+        bytes memory value = abi.encode("metadata_value");
+        
+        vm.prank(owner);
+        resolver.setContractMetadata(key, value);
+        
+        bytes memory result = resolver.getContractMetadata(key);
+        assertEq(result, value);
     }
 }

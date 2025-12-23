@@ -78,7 +78,7 @@ contract RegisterAndSetup is Script {
         // The contract owner can set records
         console.log("Setting records as msg.sender (should be owner):", msg.sender);
         credentialResolver.setText(recordKey, textValue);
-        credentialResolver.setData(recordKey, dataValue);
+        credentialResolver.setContractMetadata(recordKey, dataValue);
         
         console.log("--------------------------------------------------");
         console.log("Set credential records:");
