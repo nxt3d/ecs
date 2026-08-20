@@ -3,7 +3,7 @@ import { createECSClient, sepolia } from '@nxt3d/ecsjs'
 // Create a client for Sepolia
 const client = createECSClient({
   chain: sepolia,
-  rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/0rXVfxycbHEigHX96u1p-G02VKeV2AS5'
+  rpcUrl: process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com'
 })
 
 async function resolveTextRecord(name, key) {

@@ -7,7 +7,7 @@ import {
 
 const client = createECSClient({
   chain: sepolia,
-  rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/0rXVfxycbHEigHX96u1p-G02VKeV2AS5'
+  rpcUrl: process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com'
 })
 
 console.log('🧪 Testing ecsjs library')

@@ -30,7 +30,7 @@ const CC_RESOLVER_ADDRESS = '0xAE5A879A021982B65A691dFdcE83528e8e13dFd3'
 // Create ECS client
 const client = createECSClient({
   chain: sepolia,
-  rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/0rXVfxycbHEigHX96u1p-G02VKeV2AS5'
+  rpcUrl: process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com'
 })
 
 // Parse YAML-like output (simple parser for our specific format)
